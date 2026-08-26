@@ -1,7 +1,7 @@
 {
   "name": "svg-manual-editor",
   "displayName": "SVG 手动编辑器",
-  "description": "可视化编辑 SVG：拖动图形与箭头端点、修改/删除文字、添加框和箭头",
+  "description": "比 PPT 更顺手的科研矢量绘图：搭配 Cursor / VS Code Agent 出图，不满意就在画布上手动改",
   "version": "0.1.9",
   "publisher": "boringcat520",
   "icon": "assets/icon.png",
@@ -26,7 +26,9 @@
     "editor",
     "diagram",
     "flowchart",
-    "vector"
+    "vector",
+    "research",
+    "scientific-figure"
   ],
   "activationEvents": [
     "onCustomEditor:svgManualEditor.editor",
