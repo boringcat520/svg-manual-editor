@@ -2,7 +2,7 @@
   "name": "svg-manual-editor",
   "displayName": "SVG 手动编辑器",
   "description": "比 PPT 更顺手的科研矢量绘图：搭配 Cursor / VS Code Agent 出图，不满意就在画布上手动改",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "publisher": "boringcat520",
   "icon": "assets/icon.png",
   "license": "MIT",
