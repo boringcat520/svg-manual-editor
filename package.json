@@ -1,0 +1,70 @@
+{
+  "name": "svg-manual-editor",
+  "displayName": "SVG 手动编辑器",
+  "description": "可视化编辑 SVG：拖动图形与箭头端点、修改/删除文字、添加框和箭头",
+  "version": "0.1.1",
+  "publisher": "boringcat520",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/boringcat520/svg-manual-editor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/boringcat520/svg-manual-editor/issues"
+  },
+  "homepage": "https://github.com/boringcat520/svg-manual-editor#readme",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCustomEditor:svgManualEditor.editor",
+    "onCommand:svgManualEditor.open"
+  ],
+  "main": "./extension.js",
+  "scripts": {
+    "check": "node --check extension.js && node --check editor/editor.js",
+    "test": "npm run check && node --test test/*.test.js",
+    "package": "npx --yes @vscode/vsce package --no-dependencies"
+  },
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "svgManualEditor.editor",
+        "displayName": "SVG 手动编辑器",
+        "selector": [
+          {
+            "filenamePattern": "*.svg"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "svgManualEditor.open",
+        "title": "用 SVG 手动编辑器打开",
+        "icon": "$(edit)"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "svgManualEditor.open",
+          "when": "resourceExtname == .svg",
+          "group": "navigation@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "svgManualEditor.open",
+          "when": "resourceExtname == .svg",
+          "group": "navigation"
+        }
+      ]
+    }
+  }
+}

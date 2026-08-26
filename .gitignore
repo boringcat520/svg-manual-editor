@@ -1,0 +1,5 @@
+node_modules/
+*.vsix
+.cursor/
+figure1_structured_v3.svg
+figure1_structured_v3*.png

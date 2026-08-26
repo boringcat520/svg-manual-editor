@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <!-- CSP -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SVG 手动编辑器</title>
+  <link rel="stylesheet" href="editor.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">SVG</span>
+        <div class="brand-text">
+          <strong>手动编辑器</strong>
+          <em>拖箭头 · 改文字 · 调图形</em>
+        </div>
+      </div>
+      <div class="top-actions">
+        <label class="btn standalone-only">
+          打开
+          <input id="file-input" type="file" accept=".svg,image/svg+xml" hidden />
+        </label>
+        <button id="btn-save" class="btn primary" type="button">保存</button>
+        <div class="export-wrap">
+          <button id="btn-export" class="btn" type="button" aria-expanded="false" title="单击设置导出；双击按当前设置快速导出到 SVG 所在文件夹">导出 ▾</button>
+          <div id="export-menu" class="export-menu hidden">
+            <strong>导出高清图片</strong>
+            <label>格式
+              <select id="export-format">
+                <option value="png">PNG（透明/无损）</option>
+                <option value="jpeg">JPEG（白底）</option>
+                <option value="webp">WebP（高质量）</option>
+                <option value="svg">SVG 矢量源图</option>
+              </select>
+            </label>
+            <label>清晰度
+              <select id="export-scale">
+                <option value="1">1× 原始尺寸</option>
+                <option value="2" selected>2× 高清</option>
+                <option value="4">4× 超清</option>
+                <option value="8">8× 印刷级</option>
+              </select>
+            </label>
+            <label>背景
+              <select id="export-background">
+                <option value="transparent">透明</option>
+                <option value="white">白色</option>
+              </select>
+            </label>
+            <span id="export-size" class="export-size"></span>
+            <button id="btn-export-go" class="btn primary" type="button">导出图片</button>
+          </div>
+        </div>
+        <button id="btn-undo" class="btn" type="button" title="Ctrl+Z">撤销</button>
+        <button id="btn-redo" class="btn" type="button" title="Ctrl+Y">重做</button>
+        <button id="btn-fit" class="btn" type="button">适应画布</button>
+        <button id="btn-grid" class="btn" type="button" aria-pressed="false">网格线</button>
+        <label class="toggle">
+          <input id="snap-toggle" type="checkbox" />
+          网格吸附
+        </label>
+        <label class="toggle" title="拖动时自动吸附边缘、中心和等距位置；按住 Alt 可临时关闭">
+          <input id="smart-toggle" type="checkbox" checked />
+          智能参考线
+        </label>
+        <span id="file-name" class="file-name">未打开文件</span>
+      </div>
+      <div id="text-formatbar" class="text-formatbar" aria-label="文字格式工具栏">
+        <span class="format-caption">文字</span>
+        <div id="text-color-wrap" class="format-color-wrap">
+          <button id="btn-text-color" class="format-color" type="button" title="文字颜色" aria-label="文字颜色" aria-haspopup="true" aria-expanded="false" disabled>
+            <span class="format-color-a">A</span>
+            <span id="text-color-indicator" class="format-color-indicator" aria-hidden="true"></span>
+            <span class="format-color-arrow" aria-hidden="true">⌄</span>
+          </button>
+          <input id="top-text-color" class="format-color-native" type="color" value="#333333" aria-label="更多文字颜色" disabled />
+          <div id="text-color-menu" class="text-color-menu hidden" role="menu" aria-label="文字颜色菜单">
+            <button class="color-menu-row color-auto" type="button" data-text-color="#000000" role="menuitem">
+              <span class="color-auto-chip"></span><span>自动</span>
+            </button>
+            <div class="color-section-title">主题颜色</div>
+            <div id="text-color-theme" class="color-grid theme-colors" aria-label="主题颜色"></div>
+            <div class="color-section-title">标准色</div>
+            <div id="text-color-standard" class="color-grid standard-colors" aria-label="标准色"></div>
+            <div id="color-recent-section" class="color-recent-section hidden">
+              <div class="color-section-title">最近使用</div>
+              <div id="color-recent" class="color-grid standard-colors" aria-label="最近使用"></div>
+            </div>
+            <div class="color-section-title">渐变填充</div>
+            <div id="text-color-gradients" class="color-grid gradient-colors" aria-label="渐变填充"></div>
+            <button id="text-color-more" class="color-menu-row color-menu-command" type="button" role="menuitem" aria-haspopup="true">
+              <span class="color-wheel-icon" aria-hidden="true"></span><span>更多填充色</span><span class="menu-chevron">›</span>
+            </button>
+            <button id="text-color-custom" class="color-menu-row color-menu-command" type="button" role="menuitem">
+              <span class="palette-icon" aria-hidden="true">🎨</span><span id="text-color-custom-label">其他字体颜色(M)…</span>
+            </button>
+            <button id="text-color-eyedropper" class="color-menu-row color-menu-command" type="button" role="menuitem">
+              <span class="eyedropper-icon" aria-hidden="true">⌁</span><span>取色器(E)</span>
+            </button>
+          </div>
+        </div>
+        <select id="top-font-family" class="format-font" aria-label="字体" title="字体" disabled>
+          <option value="">字体</option>
+          <option value="SimSun, Songti SC, serif">宋体 SimSun</option>
+          <option value="Microsoft YaHei, PingFang SC, sans-serif">微软雅黑</option>
+          <option value="Times New Roman, Times, serif">Times New Roman</option>
+          <option value="Arial, Helvetica, sans-serif">Arial</option>
+          <option value="KaiTi, STKaiti, serif">楷体</option>
+        </select>
+        <div class="format-size" aria-label="字号">
+          <input id="top-font-size" type="number" min="8" max="120" step="1" placeholder="字号" aria-label="字号" disabled />
+          <div class="format-size-btns">
+            <button id="top-font-decrease" class="format-btn" type="button" title="减小字号" disabled>−</button>
+            <button id="top-font-increase" class="format-btn" type="button" title="增大字号" disabled>＋</button>
+          </div>
+        </div>
+        <span class="format-separator" aria-hidden="true"></span>
+        <button id="top-bold" class="format-btn format-letter" type="button" title="加粗" aria-pressed="false" disabled><strong>B</strong></button>
+        <button id="top-italic" class="format-btn format-letter" type="button" title="斜体" aria-pressed="false" disabled><em>I</em></button>
+        <button id="top-underline" class="format-btn format-letter" type="button" title="下划线" aria-pressed="false" disabled><u>U</u></button>
+        <span class="format-separator" aria-hidden="true"></span>
+        <button id="top-align-left" class="format-btn format-align" type="button" title="左对齐" aria-label="左对齐" aria-pressed="false" disabled>
+          <span class="align-glyph left"><i></i><i></i><i></i><i></i></span>
+        </button>
+        <button id="top-align-center" class="format-btn format-align" type="button" title="居中对齐" aria-label="居中对齐" aria-pressed="false" disabled>
+          <span class="align-glyph center"><i></i><i></i><i></i><i></i></span>
+        </button>
+        <button id="top-align-right" class="format-btn format-align" type="button" title="右对齐" aria-label="右对齐" aria-pressed="false" disabled>
+          <span class="align-glyph right"><i></i><i></i><i></i><i></i></span>
+        </button>
+        <button id="top-align-justify" class="format-btn format-align" type="button" title="两端对齐" aria-label="两端对齐" aria-pressed="false" disabled>
+          <span class="align-glyph justify"><i></i><i></i><i></i><i></i></span>
+        </button>
+        <span class="format-separator" aria-hidden="true"></span>
+        <label class="format-line-spacing" title="行间距">
+          <span class="line-spacing-glyph" aria-hidden="true"><b>↕</b><span><i></i><i></i><i></i></span></span>
+          <select id="top-line-spacing" aria-label="行间距" disabled>
+            <option value="">行距</option>
+            <option value="1">1.0×</option>
+            <option value="1.15">1.15×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2.0×</option>
+            <option value="2.5">2.5×</option>
+            <option value="3">3.0×</option>
+          </select>
+        </label>
+        <span class="format-separator" aria-hidden="true"></span>
+        <div id="symbol-wrap" class="symbol-wrap">
+          <button id="btn-symbol" class="format-btn format-symbol" type="button" title="特殊符号" aria-label="特殊符号" aria-haspopup="true" aria-expanded="false" disabled>Ω</button>
+          <div id="symbol-menu" class="symbol-menu hidden" role="dialog" aria-label="特殊符号">
+            <div id="symbol-tabs" class="symbol-tabs" role="tablist" aria-label="符号分类"></div>
+            <div id="symbol-recent-section" class="symbol-recent-section">
+              <div class="color-section-title">最近使用</div>
+              <div id="symbol-recent" class="symbol-grid" aria-label="最近使用"></div>
+            </div>
+            <div id="symbol-panels" class="symbol-panels"></div>
+          </div>
+        </div>
+        <span id="text-format-hint" class="format-hint">选择文字或含文字的图形后可用</span>
+      </div>
+    </header>
+
+    <aside class="toolbar">
+      <button class="tool active" data-tool="select" title="选择 V">选择</button>
+      <button class="tool" data-tool="pan" title="平移 H / 空格">平移</button>
+      <button class="tool" data-tool="text" title="文字 T；选中图形后点击可在内部居中添加">文字</button>
+      <div class="shape-tool-wrap">
+        <button id="btn-shape" class="tool" type="button" title="图形 R" aria-expanded="false">图形</button>
+        <div id="shape-menu" class="shape-menu hidden" role="menu" aria-label="流程图图形">
+          <button type="button" data-shape="rect" data-label="矩形" role="menuitem">
+            <svg viewBox="0 0 42 28" aria-hidden="true"><rect x="4" y="4" width="34" height="20"/></svg><span>矩形</span>
+          </button>
+          <button type="button" data-shape="rounded" data-label="圆角矩形" role="menuitem">
+            <svg viewBox="0 0 42 28" aria-hidden="true"><rect x="4" y="4" width="34" height="20" rx="6"/></svg><span>圆角矩形</span>
+          </button>
+          <button type="button" data-shape="ellipse" data-label="圆形/椭圆" role="menuitem">
+            <svg viewBox="0 0 42 28" aria-hidden="true"><ellipse cx="21" cy="14" rx="17" ry="10"/></svg><span>圆形/椭圆</span>
+          </button>
+          <button type="button" data-shape="diamond" data-label="判断菱形" role="menuitem">
+            <svg viewBox="0 0 42 28" aria-hidden="true"><polygon points="21,3 39,14 21,25 3,14"/></svg><span>判断</span>
+          </button>
+          <button type="button" data-shape="parallelogram" data-label="输入/输出" role="menuitem">
+            <svg viewBox="0 0 42 28" aria-hidden="true"><polygon points="10,4 39,4 32,24 3,24"/></svg><span>输入/输出</span>
+          </button>
+          <button type="button" data-shape="terminator" data-label="开始/结束" role="menuitem">
+            <svg viewBox="0 0 42 28" aria-hidden="true"><rect x="3" y="4" width="36" height="20" rx="10"/></svg><span>开始/结束</span>
+          </button>
+        </div>
+      </div>
+      <div class="arrow-tool-wrap">
+        <button id="btn-arrow" class="tool" type="button" title="直线箭头 A" aria-expanded="false">箭头 ▸</button>
+        <div id="arrow-menu" class="arrow-menu hidden" role="menu" aria-label="箭头直线方向">
+          <button type="button" data-arrow-mode="vertical" role="menuitem" title="只沿垂直方向绘制">
+            <svg viewBox="0 0 46 30" aria-hidden="true"><path d="M23 3 V25 M18 20 L23 26 L28 20"/></svg><span>垂直直线</span>
+          </button>
+          <button type="button" data-arrow-mode="horizontal" role="menuitem" title="只沿水平方向绘制">
+            <svg viewBox="0 0 46 30" aria-hidden="true"><path d="M4 15 H40 M35 10 L41 15 L35 20"/></svg><span>水平直线</span>
+          </button>
+          <button type="button" data-arrow-mode="free" class="active" role="menuitem" title="按拖动方向绘制倾斜直线">
+            <svg viewBox="0 0 46 30" aria-hidden="true"><path d="M6 24 L39 6 M31 6 H40 V15"/></svg><span>倾斜直线</span>
+          </button>
+        </div>
+      </div>
+      <button class="tool" data-tool="polyline" title="正交折线箭头 P；首尾点可智能吸附">折线</button>
+      <button id="btn-add-node" class="tool sub" type="button" title="给选中的线增加正交转向控制点">增加节点</button>
+      <div class="line-style-tool-wrap">
+        <button id="btn-line-style" class="tool sub" type="button" title="线条样式：线型、线宽和箭头" aria-expanded="false">线条 ▸</button>
+        <div id="line-style-menu" class="line-style-menu hidden" role="menu" aria-label="线条样式">
+          <button id="btn-line-none" type="button" role="menuitem">无线条</button>
+          <div class="line-style-heading">预设线条</div>
+          <div id="line-style-grid" class="line-style-grid"></div>
+          <div class="line-style-heading">箭头</div>
+          <div class="line-arrow-grid">
+            <button type="button" data-arrow-ends="none" role="menuitem" title="普通线条">
+              <svg viewBox="0 0 72 18" aria-hidden="true"><line x1="6" y1="9" x2="66" y2="9"/></svg>
+            </button>
+            <button type="button" data-arrow-ends="end" role="menuitem" title="终点箭头">
+              <svg viewBox="0 0 72 18" aria-hidden="true"><line x1="6" y1="9" x2="56" y2="9"/><polygon points="56,4 68,9 56,14"/></svg>
+            </button>
+            <button type="button" data-arrow-ends="start" role="menuitem" title="起点箭头">
+              <svg viewBox="0 0 72 18" aria-hidden="true"><polygon points="16,4 4,9 16,14"/><line x1="16" y1="9" x2="66" y2="9"/></svg>
+            </button>
+            <button type="button" data-arrow-ends="both" role="menuitem" title="两端箭头">
+              <svg viewBox="0 0 72 18" aria-hidden="true"><polygon points="16,4 4,9 16,14"/><line x1="16" y1="9" x2="56" y2="9"/><polygon points="56,4 68,9 56,14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <button id="btn-line-text" class="tool sub" type="button" title="在选中线的中间插入文字">线文本</button>
+      <div class="tool-sep"></div>
+      <button id="btn-front" class="tool sub" type="button">置顶</button>
+      <button id="btn-back" class="tool sub" type="button">置底</button>
+      <button id="btn-delete" class="tool danger" type="button" title="Delete">删除</button>
+    </aside>
+
+    <main class="workspace">
+      <div id="viewport">
+        <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="ed-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#d9d3c7" stroke-width="0.6"/>
+            </pattern>
+          </defs>
+          <rect id="paper" fill="#fff" pointer-events="none"></rect>
+          <rect id="paper-grid" fill="url(#ed-grid)" pointer-events="none" visibility="hidden"></rect>
+          <g id="content"></g>
+          <g id="overlay"></g>
+        </svg>
+        <div id="canvas-scroll-x" class="canvas-scrollbar horizontal" aria-label="水平滚动条">
+          <div id="canvas-scroll-thumb-x" class="canvas-scroll-thumb"></div>
+        </div>
+        <div id="canvas-scroll-y" class="canvas-scrollbar vertical" aria-label="垂直滚动条">
+          <div id="canvas-scroll-thumb-y" class="canvas-scroll-thumb"></div>
+        </div>
+        <div class="canvas-scroll-corner" aria-hidden="true"></div>
+        <textarea id="text-input" rows="1" wrap="off" hidden></textarea>
+      </div>
+    </main>
+
+    <aside id="props-panel" class="props">
+      <div class="props-head">
+        <h2>属性</h2>
+        <button id="btn-props-toggle" type="button" aria-expanded="true" title="收起属性栏">›</button>
+      </div>
+      <p id="sel-summary" class="muted">未选中对象</p>
+      <div id="prop-fields" class="prop-fields hidden">
+        <section id="prop-group-fill" class="prop-group">
+          <h3>填充</h3>
+          <div class="prop-grid">
+            <label>颜色
+              <span class="prop-color-row">
+                <button id="btn-prop-fill" class="prop-color-btn" type="button" title="填充颜色" aria-label="填充颜色" aria-haspopup="true" aria-expanded="false">
+                  <span id="prop-fill-indicator" class="prop-color-swatch" aria-hidden="true"></span>
+                  <span class="format-color-arrow" aria-hidden="true">⌄</span>
+                </button>
+                <input id="prop-fill" class="format-color-native" type="color" value="#ffffff" aria-label="更多填充颜色" />
+              </span>
+            </label>
+            <label class="check">
+              <input id="prop-fill-none" type="checkbox" /> 无填充
+            </label>
+          </div>
+        </section>
+
+        <section id="prop-group-stroke" class="prop-group">
+          <h3>描边</h3>
+          <div class="prop-grid">
+            <label>颜色
+              <span class="prop-color-row">
+                <button id="btn-prop-stroke" class="prop-color-btn" type="button" title="描边颜色" aria-label="描边颜色" aria-haspopup="true" aria-expanded="false">
+                  <span id="prop-stroke-indicator" class="prop-color-swatch is-stroke" aria-hidden="true"></span>
+                  <span class="format-color-arrow" aria-hidden="true">⌄</span>
+                </button>
+                <input id="prop-stroke" class="format-color-native" type="color" value="#b85f2a" aria-label="更多描边颜色" />
+              </span>
+            </label>
+            <label class="prop-sw-field">线宽
+              <div class="prop-size-stepper" role="group" aria-label="线宽">
+                <input id="prop-sw" type="number" min="0" step="0.2" inputmode="decimal" />
+                <div class="prop-size-btns">
+                  <button id="prop-sw-decrease" class="prop-size-btn" type="button" title="减小线宽">−</button>
+                  <button id="prop-sw-increase" class="prop-size-btn" type="button" title="增大线宽">＋</button>
+                </div>
+              </div>
+            </label>
+            <div class="line-style-field">
+              <span class="line-style-field-label">线型</span>
+              <select id="prop-line-style" class="line-style-native" tabindex="-1" aria-hidden="true">
+                <option value="solid">实线</option>
+                <option value="dashed">虚线</option>
+                <option value="dotted">点线</option>
+                <option value="dashdot">点划线</option>
+              </select>
+              <div class="line-style-combo">
+                <button id="prop-line-style-btn" type="button" class="line-style-combo-btn" aria-label="线型" aria-haspopup="listbox" aria-expanded="false" aria-controls="prop-line-style-menu">
+                  <svg viewBox="0 0 88 18" aria-hidden="true"><line id="prop-line-style-line" x1="6" y1="9" x2="70" y2="9" fill="none" stroke="#2c4a6e" stroke-width="2.2"/></svg>
+                  <span class="line-style-combo-caret" aria-hidden="true">▾</span>
+                </button>
+                <div id="prop-line-style-menu" class="line-style-combo-menu hidden" role="listbox" aria-label="线型"></div>
+              </div>
+            </div>
+            <label>拐角
+              <select id="prop-line-join">
+                <option value="miter">直角</option>
+                <option value="round">圆角</option>
+                <option value="bevel">斜角</option>
+              </select>
+            </label>
+            <label id="prop-arrow-ends-wrap" class="prop-span-2">箭头
+              <select id="prop-arrow-ends">
+                <option value="end">终点</option>
+                <option value="start">起点</option>
+                <option value="both">两端</option>
+                <option value="none">无箭头</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section id="connector-label-fields" class="prop-group prop-group-soft hidden">
+          <h3>线条文字</h3>
+          <label>内容
+            <input id="prop-line-label" type="text" placeholder="输入线条说明" />
+          </label>
+          <div class="connector-label-actions">
+            <button id="btn-line-label-add" class="btn" type="button">插入文字</button>
+            <button id="btn-line-label-remove" class="btn danger" type="button" disabled>删除文字</button>
+          </div>
+          <label>在线条上的位置
+            <div class="connector-label-position">
+              <input id="prop-line-label-position" type="range" min="0" max="100" step="1" value="50" disabled />
+              <output id="prop-line-label-position-value">50%</output>
+            </div>
+          </label>
+          <p class="connector-label-help">也可以直接拖动文字，让它沿线条移动</p>
+        </section>
+
+        <section id="prop-group-text" class="prop-group">
+          <h3>文字</h3>
+          <label id="prop-text-wrap" class="prop-span-2">内容
+            <textarea id="prop-text" rows="2"></textarea>
+          </label>
+          <div class="prop-grid">
+            <label class="prop-font-size">字号
+              <div class="prop-size-stepper" role="group" aria-label="字号">
+                <input id="prop-fs" type="number" min="8" max="120" step="1" inputmode="numeric" />
+                <div class="prop-size-btns">
+                  <button id="prop-fs-decrease" class="prop-size-btn" type="button" title="减小字号" disabled>−</button>
+                  <button id="prop-fs-increase" class="prop-size-btn" type="button" title="增大字号" disabled>＋</button>
+                </div>
+              </div>
+            </label>
+            <label>字体
+              <select id="prop-ff">
+                <option value="SimSun, Songti SC, serif">宋体 SimSun</option>
+                <option value="Microsoft YaHei, PingFang SC, sans-serif">微软雅黑</option>
+                <option value="Times New Roman, Times, serif">Times New Roman</option>
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="KaiTi, STKaiti, serif">楷体</option>
+              </select>
+            </label>
+          </div>
+          <div id="prop-text-format" class="prop-text-format">
+            <div class="prop-format-field">
+              <span class="prop-field-label">字形</span>
+              <div class="prop-btn-group" role="group" aria-label="字形">
+                <button id="prop-bold" class="format-btn format-letter" type="button" title="加粗" aria-pressed="false" disabled><strong>B</strong></button>
+                <button id="prop-italic" class="format-btn format-letter" type="button" title="斜体" aria-pressed="false" disabled><em>I</em></button>
+                <button id="prop-underline" class="format-btn format-letter" type="button" title="下划线" aria-pressed="false" disabled><u>U</u></button>
+              </div>
+            </div>
+            <div class="prop-format-field">
+              <span class="prop-field-label">对齐</span>
+              <div class="prop-btn-group" role="group" aria-label="对齐">
+                <button id="prop-align-left" class="format-btn format-align" type="button" title="左对齐" aria-label="左对齐" aria-pressed="false" disabled>
+                  <span class="align-glyph left"><i></i><i></i><i></i><i></i></span>
+                </button>
+                <button id="prop-align-center" class="format-btn format-align" type="button" title="居中对齐" aria-label="居中对齐" aria-pressed="false" disabled>
+                  <span class="align-glyph center"><i></i><i></i><i></i><i></i></span>
+                </button>
+                <button id="prop-align-right" class="format-btn format-align" type="button" title="右对齐" aria-label="右对齐" aria-pressed="false" disabled>
+                  <span class="align-glyph right"><i></i><i></i><i></i><i></i></span>
+                </button>
+                <button id="prop-align-justify" class="format-btn format-align" type="button" title="两端对齐" aria-label="两端对齐" aria-pressed="false" disabled>
+                  <span class="align-glyph justify"><i></i><i></i><i></i><i></i></span>
+                </button>
+              </div>
+            </div>
+            <label class="prop-line-spacing-field">行距
+              <span class="format-line-spacing">
+                <span class="line-spacing-glyph" aria-hidden="true"><b>↕</b><span><i></i><i></i><i></i></span></span>
+                <select id="prop-line-spacing" aria-label="行间距" disabled>
+                  <option value="">行距</option>
+                  <option value="1">1.0×</option>
+                  <option value="1.15">1.15×</option>
+                  <option value="1.5">1.5×</option>
+                  <option value="2">2.0×</option>
+                  <option value="2.5">2.5×</option>
+                  <option value="3">3.0×</option>
+                </select>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <section id="prop-group-position" class="prop-group">
+          <h3>位置</h3>
+          <div class="prop-grid">
+            <label>X <input id="prop-x" type="number" step="1" /></label>
+            <label>Y <input id="prop-y" type="number" step="1" /></label>
+          </div>
+        </section>
+      </div>
+      <div class="hints">
+        <h3>操作说明</h3>
+        <ul>
+          <li>单击选中，拖动移动</li>
+          <li>拖方框会带上框内文字</li>
+          <li>「图形」二级菜单可创建常用流程图图形</li>
+          <li>「箭头」二级菜单可选择垂直、水平或倾斜直线</li>
+          <li>选中箭头后点击旁边的 ↻ 图标，只顺时针旋转箭头头部 90°</li>
+          <li>新箭头默认只有起点和终点，不会自动增加折点</li>
+          <li>选中线后点击「增加节点」，拖动黄色控制点生成水平/垂直绕行</li>
+          <li>选中线或图形后点击「线条」，用预设预览选择线型/线宽，或切换普通线条和箭头</li>
+          <li>选中线后点击「线文本」即可在线条中点输入，也可用滑杆或直接拖动沿线调整位置</li>
+          <li>箭头两端可吸附到图形四边中点，只移动该端点，不会自动增加折点</li>
+          <li>箭头终点接近其他箭头端点时会提示等高或同列并自动吸附</li>
+          <li>拖动时显示所有图形的四边中点</li>
+          <li>折线工具依次单击加点，双击/Enter 结束</li>
+          <li>折线终点可吸附到图形边缘，不会额外插入接近段或折点</li>
+          <li>选中图形后点击「文字」，会在图形内部居中生成文本并直接输入</li>
+          <li>轻点文字只选中；明确拖动才移动；双击或 Enter/F2 编辑并复制内容</li>
+          <li>顶部文字栏可修改颜色、字体、字号、字形和对齐方式</li>
+          <li>顶部支持左/中/右/两端对齐及多行文字行间距</li>
+          <li>Delete 删除，Ctrl+Z 撤销</li>
+          <li>滚轮缩放，空格拖动画布</li>
+          <li>底部/右侧滚动条可精确移动画布</li>
+          <li>单击顶部「导出」调整格式；双击按当前设置直接导出到 SVG 所在文件夹</li>
+          <li>拖动时自动对齐并吸附到等距位置</li>
+          <li>缩放矩形时会自动吸附到其他图形的同宽/同高</li>
+          <li>按住 Alt 可临时关闭智能吸附</li>
+        </ul>
+      </div>
+    </aside>
+
+    <footer class="status">
+      <span id="status-text">打开一个 SVG，或把文件拖到画布上</span>
+      <span id="zoom-text">100%</span>
+    </footer>
+  </div>
+  <div id="color-more-fills" class="color-more-fills hidden" role="menu" aria-label="更多填充色">
+    <div id="color-more-fills-grid" class="color-grid more-fill-colors"></div>
+    <button id="color-more-settings" class="color-menu-row color-menu-command" type="button">更多设置(O)…</button>
+  </div>
+  <div id="color-dialog-layer" class="color-dialog-layer hidden" aria-hidden="true">
+    <div id="color-dialog" class="color-dialog" role="dialog" aria-modal="true" aria-labelledby="color-dialog-title">
+      <header class="color-dialog-head">
+        <h3 id="color-dialog-title">颜色</h3>
+        <button id="color-dialog-close" class="color-dialog-x" type="button" aria-label="关闭">×</button>
+      </header>
+      <div class="color-dialog-tabs" role="tablist">
+        <button type="button" class="color-dialog-tab active" data-color-tab="standard" role="tab" aria-selected="true">标准</button>
+        <button type="button" class="color-dialog-tab" data-color-tab="custom" role="tab" aria-selected="false">自定义</button>
+        <button type="button" class="color-dialog-tab" data-color-tab="advanced" role="tab" aria-selected="false">高级</button>
+      </div>
+      <div id="color-tab-standard" class="color-dialog-pane">
+        <div class="color-dialog-pane-label">颜色(C)</div>
+        <div class="color-dialog-standard-layout">
+          <div class="color-dialog-spectrum">
+            <div id="color-dialog-standard-grid" class="color-dialog-standard-grid"></div>
+            <div class="color-dialog-gray-row" id="color-dialog-gray-row"></div>
+          </div>
+          <div class="color-dialog-preview-split" aria-label="新增与当前颜色">
+            <span id="color-dialog-new" class="color-dialog-preview-swatch"><em>新增</em></span>
+            <span id="color-dialog-current" class="color-dialog-preview-swatch"><em>当前</em></span>
+          </div>
+        </div>
+      </div>
+      <div id="color-tab-custom" class="color-dialog-pane hidden">
+        <div class="color-dialog-custom">
+          <canvas id="color-sv-canvas" width="220" height="150"></canvas>
+          <input id="color-hue-slider" class="color-hue-slider" type="range" min="0" max="360" step="1" value="0" aria-label="色相" />
+          <div class="color-dialog-rgb-row">
+            <label>R <input id="color-input-r" type="number" min="0" max="255" /></label>
+            <label>G <input id="color-input-g" type="number" min="0" max="255" /></label>
+            <label>B <input id="color-input-b" type="number" min="0" max="255" /></label>
+          </div>
+        </div>
+      </div>
+      <div id="color-tab-advanced" class="color-dialog-pane hidden">
+        <div class="color-dialog-advanced">
+          <label>十六进制 <input id="color-input-hex" type="text" maxlength="7" spellcheck="false" /></label>
+          <label>H <input id="color-input-h" type="range" min="0" max="360" /><input id="color-input-h-num" type="number" min="0" max="360" /></label>
+          <label>S <input id="color-input-s" type="range" min="0" max="100" /><input id="color-input-s-num" type="number" min="0" max="100" /></label>
+          <label>L <input id="color-input-l" type="range" min="0" max="100" /><input id="color-input-l-num" type="number" min="0" max="100" /></label>
+          <div class="color-section-title">最近使用</div>
+          <div id="color-dialog-recent" class="color-grid standard-colors" aria-label="最近使用"></div>
+        </div>
+      </div>
+      <footer class="color-dialog-actions">
+        <button id="color-dialog-ok" class="btn primary" type="button">确定</button>
+        <button id="color-dialog-cancel" class="btn" type="button">取消</button>
+      </footer>
+    </div>
+  </div>
+  <div id="eyedropper-layer" class="eyedropper-layer hidden" aria-hidden="true" aria-label="取色器，单击画布确认，Esc 取消">
+    <div id="eyedropper-cursor" class="eyedropper-cursor" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="32" height="32">
+        <path fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"
+          d="M18.4 13.2 L6.4 27.4 3.2 28.6 4.6 25.4 16.8 11.8z" />
+        <path id="eyedropper-cursor-fill" fill="#fff" stroke="#1f2937" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+          d="M18.4 13.2 L6.4 27.4 3.2 28.6 4.6 25.4 16.8 11.8z" />
+      </svg>
+    </div>
+    <div id="eyedropper-loupe" class="eyedropper-loupe">
+      <div id="eyedropper-ring" class="eyedropper-ring">
+        <canvas id="eyedropper-glass" width="143" height="143"></canvas>
+      </div>
+      <div class="eyedropper-chip">
+        <span id="eyedropper-swatch" class="eyedropper-swatch"></span>
+        <span class="eyedropper-values">
+          <strong id="eyedropper-hex">#FFFFFF</strong>
+          <em id="eyedropper-rgb">RGB 255, 255, 255</em>
+        </span>
+      </div>
+    </div>
+  </div>
+  <!-- BOOT -->
+  <script src="editor.js"></script>
+</body>
+</html>
