@@ -6,7 +6,7 @@
 
 专为研究生科研绘图：机制图、流程图、框架图、实验方案图，任意形式都可以。
 
-<p align="center"><img src="assets/screenshot.png?v=redacted" alt="SVG 手动编辑器界面：科研流程图画布（图中文字已打码）、顶边与左边标尺、图形工具与属性栏"></p>
+<p align="center"><img src="assets/screenshot-demo.png" alt="SVG 手动编辑器界面：步骤一至步骤五示例流程图、顶边与左边标尺、图形工具与属性栏"></p>
 
 ## 为什么不用 PPT 硬画
 
@@ -47,10 +47,10 @@ Agent 负责「从零到有、从有到多种方案」，你负责「像改 PPT 
 
 ## 安装 VSIX
 
-从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.12.vsix`，然后任选一种方式安装：
+从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.13.vsix`，然后任选一种方式安装：
 
 - **Cursor / VS Code：** 扩展面板 → `⋯` → **Install from VSIX…**，选中下载的 `.vsix`
-- **命令行：** `code --install-extension svg-manual-editor-0.1.12.vsix`（Cursor 可用 `cursor --install-extension`）
+- **命令行：** `code --install-extension svg-manual-editor-0.1.13.vsix`（Cursor 可用 `cursor --install-extension`）
 
 安装后重启编辑器，在资源管理器里对 `.svg` 右键 → **用 SVG 手动编辑器打开**。
 
