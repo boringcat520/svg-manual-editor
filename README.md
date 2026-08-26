@@ -1,5 +1,7 @@
 # SVG 手动编辑器
 
+<p align="center"><img src="assets/icon.png" width="144" alt="SVG 手动编辑器图标"></p>
+
 可视化编辑 SVG：拖动图形、拉箭头端点、修改/删除文字。可在 Cursor 里当扩展用，也可在浏览器里单独打开。
 
 ## 安装 VSIX

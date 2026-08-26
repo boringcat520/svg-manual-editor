@@ -8,6 +8,21 @@ const editorSource = fs.readFileSync(path.join(root, "editor", "editor.js"), "ut
 const extensionSource = fs.readFileSync(path.join(root, "extension.js"), "utf8");
 const htmlSource = fs.readFileSync(path.join(root, "editor", "index.html"), "utf8");
 const cssSource = fs.readFileSync(path.join(root, "editor", "editor.css"), "utf8");
+const packageManifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+const iconSvgSource = fs.readFileSync(path.join(root, "assets", "icon.svg"), "utf8");
+const iconPng = fs.readFileSync(path.join(root, "assets", "icon.png"));
+const installerSource = fs.readFileSync(path.join(root, "install-extension.ps1"), "utf8");
+
+test("the extension ships an editable SVG icon and a marketplace PNG", () => {
+  assert.equal(packageManifest.icon, "assets/icon.png");
+  assert.match(iconSvgSource, /viewBox="0 0 512 512"/);
+  assert.match(iconSvgSource, /id="grid"/);
+  assert.match(iconSvgSource, /M284 190H350V290/);
+  assert.deepEqual([...iconPng.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(iconPng.readUInt32BE(16), 512);
+  assert.equal(iconPng.readUInt32BE(20), 512);
+  assert.match(installerSource, /Copy-Item \(Join-Path \$src "assets"\)/);
+});
 
 test("SVG loading cannot loop forever on an unchanged firstChild", () => {
   assert.doesNotMatch(editorSource, /while\s*\(\s*svg\.firstChild\s*\)/);

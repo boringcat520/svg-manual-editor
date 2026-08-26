@@ -4,6 +4,7 @@
   "description": "可视化编辑 SVG：拖动图形与箭头端点、修改/删除文字、添加框和箭头",
   "version": "0.1.1",
   "publisher": "boringcat520",
+  "icon": "assets/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",

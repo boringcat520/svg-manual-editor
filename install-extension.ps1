@@ -14,6 +14,7 @@ Copy-Item (Join-Path $src "package.json") $dest
 Copy-Item (Join-Path $src "extension.js") $dest
 Copy-Item (Join-Path $src "README.md") $dest
 Copy-Item (Join-Path $src ".vscodeignore") $dest -ErrorAction SilentlyContinue
+Copy-Item (Join-Path $src "assets") (Join-Path $dest "assets") -Recurse
 Copy-Item (Join-Path $src "editor") (Join-Path $dest "editor") -Recurse
 
 Write-Host "Installed to $dest"
