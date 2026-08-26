@@ -6,7 +6,7 @@
 
 专为研究生科研绘图：机制图、流程图、框架图、实验方案图，任意形式都可以。
 
-<p align="center"><img src="assets/screenshot.png" alt="SVG 手动编辑器界面：科研流程图画布、顶边与左边标尺、图形工具与属性栏"></p>
+<p align="center"><img src="assets/screenshot.png?v=redacted" alt="SVG 手动编辑器界面：科研流程图画布（图中文字已打码）、顶边与左边标尺、图形工具与属性栏"></p>
 
 ## 为什么不用 PPT 硬画
 
