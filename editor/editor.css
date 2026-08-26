@@ -714,6 +714,8 @@ html, body {
 .format-size-btns .format-btn {
   margin-left: -1px;
   border-radius: 0;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .format-size-btns .format-btn:last-child { border-radius: 0 6px 6px 0; }
@@ -753,37 +755,38 @@ html, body {
   align-items: center;
   flex: 0 0 auto;
   height: 30px;
+  padding: 0 2px 0 0;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
+  box-sizing: border-box;
   overflow: hidden;
 }
 
 .format-line-spacing select {
   width: 66px;
   height: 28px;
-  padding: 3px 4px 3px 1px;
+  padding: 0 4px 0 4px;
   border: 0;
   outline: 0;
-  background: #fff;
+  background: transparent;
   color: var(--ink);
   font: inherit;
   font-size: 11px;
+  line-height: 28px;
   cursor: pointer;
 }
 
 .line-spacing-glyph {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding-left: 5px;
+  display: block;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 16px;
+  margin: 0 2px 0 6px;
   color: var(--accent);
   pointer-events: none;
+  overflow: visible;
 }
-
-.line-spacing-glyph b { font-size: 14px; font-weight: 500; line-height: 1; }
-.line-spacing-glyph span { display: flex; flex-direction: column; gap: 2px; width: 11px; }
-.line-spacing-glyph i { display: block; width: 11px; height: 1.5px; background: currentColor; }
 
 .format-hint {
   flex: 0 0 auto;
@@ -1003,6 +1006,17 @@ html, body {
   font-size: 11px;
 }
 
+.canvas-size-btn {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.canvas-size-btn[aria-pressed="true"] {
+  background: #e7eef5;
+  border-color: #9ebbd3;
+  color: var(--accent);
+}
+
 .tool {
   height: 40px;
   min-width: 0;
@@ -1046,16 +1060,64 @@ html, body {
 }
 
 .workspace {
+  display: grid;
+  grid-template-columns: 0 minmax(0, 1fr);
+  grid-template-rows: 0 minmax(0, 1fr);
+  grid-template-areas:
+    "ruler-corner ruler-h"
+    "ruler-v viewport";
   min-width: 0;
   min-height: 0;
   background:
     radial-gradient(circle at top, #ebe4d8 0%, #ded6c9 55%, #d4ccbe 100%);
 }
 
+.workspace.rulers-on {
+  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-rows: 24px minmax(0, 1fr);
+}
+
+.ruler-corner {
+  grid-area: ruler-corner;
+  background: #d0cbc2;
+  border-right: 1px solid #b7b1a6;
+  border-bottom: 1px solid #b7b1a6;
+}
+
+.ruler {
+  display: block;
+  overflow: hidden;
+  background: #d8d4cb;
+  pointer-events: none;
+  shape-rendering: crispEdges;
+}
+
+.ruler-h {
+  grid-area: ruler-h;
+  width: 100%;
+  height: 100%;
+  border-bottom: 1px solid #b7b1a6;
+}
+
+.ruler-v {
+  grid-area: ruler-v;
+  width: 100%;
+  height: 100%;
+  border-right: 1px solid #b7b1a6;
+}
+
+.workspace:not(.rulers-on) .ruler,
+.workspace:not(.rulers-on) .ruler-corner {
+  visibility: hidden;
+}
+
 #viewport {
+  grid-area: viewport;
   position: relative;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   cursor: default;
   user-select: none;
@@ -1221,6 +1283,27 @@ html, body {
 }
 
 .prop-group.hidden { display: none; }
+
+#prop-w-field.hidden,
+#prop-h-field.hidden,
+#prop-square-field.hidden { display: none; }
+
+.prop-square-field {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prop-square-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.prop-square-actions .btn {
+  padding: 6px 5px;
+}
 
 .prop-group h3,
 .props .prop-group h3 {
@@ -1388,6 +1471,8 @@ html, body {
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .prop-size-btns .prop-size-btn { margin-left: -1px; }
@@ -1721,6 +1806,11 @@ html, body {
   stroke-dasharray: 5 3;
 }
 .smart-guide.size { stroke: #7b4fd4; stroke-dasharray: 4 2; }
+.smart-guide.dimension {
+  stroke: #3d5a73;
+  stroke-width: 1.2;
+  stroke-dasharray: none;
+}
 .smart-guide.size-match {
   stroke: #df3f8f;
   stroke-width: 1.6;
@@ -1976,6 +2066,7 @@ html, body {
 .line-arrow-grid svg polygon { stroke: none; }
 
 .smart-guide-label.size { fill: #6941c6; }
+.smart-guide-label.dimension { fill: #2c4a6e; }
 .smart-guide-label.endpoint { fill: #2c6fa3; }
 
 .connection-anchor-candidate {

@@ -52,6 +52,8 @@ test("property controls update only the field that emitted the event", () => {
   assert.match(cssSource, /\.prop-size-btns/);
   assert.match(cssSource, /\.prop-color-swatch\.is-stroke/);
   assert.match(editorSource, /nudgePropFontSize\(/);
+  assert.match(editorSource, /bindHoldRepeat\(/);
+  assert.match(editorSource, /startHoldRepeat\(/);
   assert.match(htmlSource, /id="prop-sw-decrease"/);
   assert.match(htmlSource, /id="prop-sw-increase"/);
   assert.match(cssSource, /\.format-size-btns/);
@@ -103,6 +105,10 @@ test("top text toolbar exposes common formatting and alignment controls", () => 
   assert.match(editorSource, /textLength/);
   assert.match(editorSource, /lengthAdjust/);
   assert.match(editorSource, /applyTextLineSpacing\(targets, multiplier\)/);
+  assert.match(editorSource, /writeTextElementContent\(/);
+  assert.match(editorSource, /textElementPlainText\(/);
+  assert.match(editorSource, /e\.key === "Enter" && \(e\.ctrlKey \|\| e\.metaKey\)/);
+  assert.doesNotMatch(editorSource, /e\.key === "Enter" && !e\.shiftKey/);
   assert.match(editorSource, /insertSpecialSymbol\(/);
   assert.match(editorSource, /rememberSymbol\(/);
   assert.match(editorSource, /recentSymbols/);
@@ -113,6 +119,15 @@ test("top text toolbar exposes common formatting and alignment controls", () => 
   assert.match(editorSource, /label:\s*"其他符号"/);
   assert.match(editorSource, /textLineSpacingGroups\(targets\)/);
   assert.match(cssSource, /\.format-line-spacing\s*\{/);
+  assert.doesNotMatch(htmlSource, /<option value="">行距<\/option>/);
+  assert.match(htmlSource, /<option value="1">1\.0×<\/option>/);
+  assert.match(htmlSource, /<option value="1\.2">1\.2×<\/option>/);
+  assert.match(htmlSource, /class="line-spacing-glyph"/);
+  assert.match(htmlSource, /M4 1\.6v12\.8/);
+  assert.match(cssSource, /\.line-spacing-glyph\s*\{/);
+  assert.match(cssSource, /\.smart-guide\.dimension/);
+  assert.match(editorSource, /boxDimensionGuides\(/);
+  assert.match(editorSource, /kind === "dimension"/);
   assert.match(cssSource, /\.text-color-menu\s*\{/);
   assert.match(editorSource, /buildTextColorPalette\(\)/);
   assert.match(editorSource, /applyTextGradient\(from, to\)/);
@@ -185,6 +200,15 @@ test("straight lines, arrows and polylines support movable text labels", () => {
   assert.match(cssSource, /\.prop-btn-group/);
   assert.match(cssSource, /\.prop-line-spacing-field/);
   assert.match(htmlSource, /id="prop-group-position"/);
+  assert.match(htmlSource, /id="prop-w"/);
+  assert.match(htmlSource, /id="prop-h"/);
+  assert.match(htmlSource, /id="prop-square-from-w"/);
+  assert.match(htmlSource, /id="prop-square-from-h"/);
+  assert.match(editorSource, /makeSelectedSquare\(/);
+  assert.match(cssSource, /\.prop-square-field/);
+  assert.match(editorSource, /applySelectedSize\(/);
+  assert.match(editorSource, /currentSize\(/);
+  assert.match(editorSource, /syncPositionSizeProps\(/);
   assert.match(cssSource, /\.prop-grid/);
   assert.match(editorSource, /togglePropGroup\(/);
   assert.match(editorSource, /createConnectorLabel\(connector, text/);
@@ -208,6 +232,14 @@ test("straight lines, arrows and polylines support movable text labels", () => {
 
 test("grid visibility and PPT-like smart spacing controls are wired", () => {
   assert.match(htmlSource, /id="btn-grid"/);
+  assert.match(htmlSource, /id="btn-canvas-size"/);
+  assert.match(htmlSource, />标尺<\/button>/);
+  assert.match(htmlSource, /id="ruler-h"/);
+  assert.match(htmlSource, /id="ruler-v"/);
+  assert.match(editorSource, /syncCanvasSizeButton\(/);
+  assert.match(editorSource, /toggleRulers\(/);
+  assert.match(editorSource, /rulerMarks\(/);
+  assert.doesNotMatch(htmlSource, /id="canvas-size-menu"/);
   assert.match(htmlSource, /id="smart-toggle"[^>]*checked/);
   assert.ok(htmlSource.indexOf('id="paper"') < htmlSource.indexOf('id="paper-grid"'));
   assert.match(editorSource, /horizontalSpacingCandidates\(/);
@@ -215,7 +247,8 @@ test("grid visibility and PPT-like smart spacing controls are wired", () => {
   assert.match(editorSource, /drawSmartGuides\(smart\.guides\)/);
   assert.match(editorSource, /e\.altKey/);
   assert.match(editorSource, /collectResizeTargets\(/);
-  assert.match(editorSource, /label: `同宽 /);
+  assert.match(editorSource, /constrainResizeAspect\(/);
+  assert.match(editorSource, /e\.ctrlKey \|\| e\.metaKey \? d\.resizeOrigin/);
   assert.match(editorSource, /label: `同高 /);
   assert.match(editorSource, /kind: "size"/);
   assert.match(editorSource, /guide\.matchLine/);

@@ -199,6 +199,10 @@ test("resize handles use the correct directional mouse cursors", () => {
   editor.addHandle(20, 30, { kind: "shape", pos: "se" });
   const handle = nodes.get("overlay").childNodes.at(-1);
   assert.equal(handle.getAttribute("class"), "handle vertex resize-handle resize-se");
+
+  editor.addHandle(40, 50, { kind: "text", pos: "nw" });
+  const textHandle = nodes.get("overlay").childNodes.at(-1);
+  assert.equal(textHandle.getAttribute("class"), "handle vertex resize-handle resize-nw");
 });
 
 test("text drag threshold distinguishes a click from an intentional move", () => {
@@ -362,7 +366,41 @@ test("line spacing distributes separately selected SVG text lines", () => {
   assert.equal(Number(second.getAttribute("y")), 140);
   assert.equal(first.getAttribute("data-line-spacing"), "2");
   assert.equal(second.getAttribute("data-line-spacing"), "2");
+
+  editor.applyTextFormat("line-spacing", 1.2);
+  assert.equal(Number(second.getAttribute("y")), 124);
+  assert.equal(second.getAttribute("data-line-spacing"), "1.2");
   clearTimeout(editor._propTimer);
+});
+
+test("text editing Enter inserts a line instead of committing", () => {
+  const { editor, nodes } = loadEditor();
+  const text = new FakeNode("title", "text");
+  text.setAttribute("x", "40");
+  text.setAttribute("y", "80");
+  text.setAttribute("font-size", "16");
+  text.textContent = "第一行";
+  editor.selected = [text];
+  editor.commit = (label) => { editor.lastCommit = label; };
+  editor.syncConnectorLabels = () => {};
+  editor.refreshHits = () => {};
+  editor.redrawOverlay = () => {};
+  editor.updateProps = () => {};
+  editor.pruneUnusedArrowheadMarkers = () => {};
+  editor.pruneDanglingGlue = () => {};
+  editor.syncJustifiedText = () => {};
+  editor.queueSync = () => {};
+
+  editor.startTextEdit(text);
+  assert.equal(nodes.get("text-input").value, "第一行");
+  nodes.get("text-input").value = "第一行\n第二行";
+  editor.commitTextEdit();
+  const spans = text.childNodes.filter((node) => String(node.tagName).toLowerCase() === "tspan");
+  assert.equal(spans.length, 2);
+  assert.equal(spans[0].textContent, "第一行");
+  assert.equal(spans[1].textContent, "第二行");
+  assert.equal(editor.textElementPlainText(text), "第一行\n第二行");
+  assert.equal(editor.lastCommit, "已修改文字");
 });
 
 test("Alt bypasses equal-size snapping while resizing", () => {
@@ -378,6 +416,110 @@ test("Alt bypasses equal-size snapping while resizing", () => {
   assert.equal(Number(rect.getAttribute("width")), 96);
   assert.equal(Number(rect.getAttribute("height")), 78);
   assert.deepEqual(JSON.parse(JSON.stringify(guides)), []);
+});
+
+test("Ctrl keeps width and height proportional while resizing", () => {
+  const { editor } = loadEditor();
+  const origin = { x: 100, y: 120, w: 100, h: 50 };
+  const rect = new FakeNode("scaled", "rect");
+  rect.setAttribute("x", origin.x);
+  rect.setAttribute("y", origin.y);
+  rect.setAttribute("width", origin.w);
+  rect.setAttribute("height", origin.h);
+
+  editor.resizeRect(rect, "se", 300, 220, [], false, origin);
+  assert.equal(Number(rect.getAttribute("x")), 100);
+  assert.equal(Number(rect.getAttribute("y")), 120);
+  assert.equal(Number(rect.getAttribute("width")), 200);
+  assert.equal(Number(rect.getAttribute("height")), 100);
+
+  rect.setAttribute("x", origin.x);
+  rect.setAttribute("y", origin.y);
+  rect.setAttribute("width", origin.w);
+  rect.setAttribute("height", origin.h);
+  editor.resizeRect(rect, "e", 250, 145, [], false, origin);
+  assert.equal(Number(rect.getAttribute("width")), 150);
+  assert.equal(Number(rect.getAttribute("height")), 75);
+  assert.equal(Number(rect.getAttribute("x")), 100);
+  assert.equal(Number(rect.getAttribute("y")), 107.5);
+});
+
+test("selected text exposes box resize handles", () => {
+  const { editor, nodes } = loadEditor();
+  const text = new FakeNode("caption", "text");
+  text.isConnected = true;
+  text.getBBox = () => ({ x: 10, y: 20, width: 80, height: 24 });
+  editor.selected = [text];
+  editor.redrawOverlay();
+
+  const handles = nodes.get("overlay").childNodes.filter((node) =>
+    String(node.getAttribute("class") || "").includes("resize-handle")
+  );
+  assert.equal(handles.length, 8);
+  assert.equal(handles[4].getAttribute("class"), "handle vertex resize-handle resize-se");
+  assert.equal(handles[4]._ed.kind, "text");
+  assert.equal(handles[4]._ed.el, text);
+
+  const label = new FakeNode("line-label", "text");
+  label.isConnected = true;
+  label.setAttribute("data-line-label-for", "line-abc");
+  label.getBBox = () => ({ x: 30, y: 40, width: 40, height: 16 });
+  editor.selected = [label];
+  editor.redrawOverlay();
+  const labelHandles = nodes.get("overlay").childNodes.filter((node) =>
+    String(node.getAttribute("class") || "").includes("resize-handle")
+  );
+  assert.equal(labelHandles.length, 0);
+});
+
+test("resizing text scales font size and baseline with the box", () => {
+  const { editor } = loadEditor();
+  const text = new FakeNode("caption", "text");
+  text.style.fontSize = "20px";
+  text.setAttribute("font-size", "20");
+  text.setAttribute("x", "40");
+  text.setAttribute("y", "80");
+  const span1 = new FakeNode("", "tspan");
+  span1.setAttribute("x", "40");
+  span1.setAttribute("y", "80");
+  const span2 = new FakeNode("", "tspan");
+  span2.setAttribute("x", "40");
+  span2.setAttribute("y", "104");
+  text.appendChild(span1);
+  text.appendChild(span2);
+  const origin = {
+    x: 10,
+    y: 20,
+    w: 80,
+    h: 24,
+    fontSize: 20,
+    textX: 40,
+    textY: 80,
+    tspans: [
+      { x: 40, y: 80 },
+      { x: 40, y: 104 },
+    ],
+  };
+
+  editor.resizeText(text, "se", 170, 68, [], false, origin);
+  assert.equal(Number(text.getAttribute("font-size")), 40);
+  assert.equal(text.style.fontSize, "40px");
+  assert.equal(Number(text.getAttribute("x")), 70);
+  assert.equal(Number(text.getAttribute("y")), 140);
+  assert.equal(Number(span1.getAttribute("x")), 70);
+  assert.equal(Number(span1.getAttribute("y")), 140);
+  assert.equal(Number(span2.getAttribute("x")), 70);
+  assert.equal(Number(span2.getAttribute("y")), 188);
+});
+
+test("resizing shows live width and height labels", () => {
+  const { editor } = loadEditor();
+  const guides = editor.boxDimensionGuides(box(200, 100, 120, 80));
+  assert.equal(guides.length, 2);
+  assert.equal(guides[0].kind, "dimension");
+  assert.equal(guides[0].label, "宽 120");
+  assert.equal(guides[1].kind, "dimension");
+  assert.equal(guides[1].label, "高 80");
 });
 
 test("flowchart shape geometry is preserved for each menu shape", () => {
@@ -1468,6 +1610,21 @@ test("property font size stepper grows and shrinks selected text", () => {
   clearTimeout(editor._propTimer);
 });
 
+test("holding a size stepper repeats the change until released", () => {
+  const { editor, nodes } = loadEditor();
+  const button = nodes.get("top-font-increase");
+  button.disabled = false;
+  let count = 0;
+  editor.startHoldRepeat(button, () => {
+    count += 1;
+  });
+  assert.equal(count, 1);
+  assert.ok(editor._holdRepeat);
+  editor.stopHoldRepeat();
+  assert.equal(editor._holdRepeat, null);
+  assert.equal(count, 1);
+});
+
 test("property stroke width stepper grows and shrinks selected lines", () => {
   const { editor, nodes } = loadEditor();
   const connector = new FakeNode("stroke-line", "path");
@@ -1702,6 +1859,46 @@ test("canvas scrollbar metrics track zoom and map thumb movement to viewBox", ()
   assert.equal(editor.scrollDrag, null);
 });
 
+test("top bar ruler button toggles canvas rulers that follow zoom and pan", () => {
+  const { editor, nodes } = loadEditor();
+  editor.docBox = { x: 0, y: 0, w: 1800, h: 820 };
+  editor.syncCanvasSizeButton();
+  assert.match(nodes.get("btn-canvas-size").title, /1800/);
+  assert.match(nodes.get("btn-canvas-size").title, /820/);
+  assert.equal(editor.rulersVisible, false);
+  assert.equal(nodes.get("workspace").classList.contains("rulers-on"), false);
+
+  assert.equal(editor.setRulersVisible(true, false, false), true);
+  assert.equal(nodes.get("workspace").classList.contains("rulers-on"), true);
+  assert.equal(nodes.get("btn-canvas-size").getAttribute("aria-pressed"), "true");
+  assert.ok(nodes.get("ruler-h").childNodes.length > 1);
+  assert.ok(nodes.get("ruler-v").childNodes.length > 1);
+
+  const marks = editor.rulerMarks(0, 1000, 1000);
+  assert.equal(marks.major, 100);
+  const zero = marks.ticks.find((tick) => tick.label === "0");
+  const hundred = marks.ticks.find((tick) => tick.label === "100");
+  assert.equal(zero && Math.round(zero.px), 0);
+  assert.equal(hundred && Math.round(hundred.px), 100);
+  assert.ok(marks.ticks.some((tick) => tick.kind === "mid" && Math.round(tick.px) === 50));
+
+  const panned = editor.rulerMarks(200, 1000, 1000);
+  assert.equal(panned.ticks.find((tick) => tick.label === "0"), undefined);
+  const twoHundred = panned.ticks.find((tick) => tick.label === "200");
+  assert.equal(twoHundred && Math.round(twoHundred.px), 0);
+
+  editor.view = { x: 0, y: 0, w: 100, h: 60 };
+  editor.updateRulers();
+  const zoomed = editor.rulerMarks(0, 100, 1000);
+  assert.equal(zoomed.major, 10);
+  const ten = zoomed.ticks.find((tick) => tick.label === "10");
+  assert.equal(ten && Math.round(ten.px), 100);
+
+  editor.setRulersVisible(false, false, false);
+  assert.equal(nodes.get("workspace").classList.contains("rulers-on"), false);
+  assert.equal(nodes.get("ruler-h").childNodes.length, 0);
+});
+
 test("property sidebar can collapse and expand without losing its toggle", () => {
   const { editor, nodes } = loadEditor();
   assert.equal(editor.togglePropsPanel(true, false), true);
@@ -1732,10 +1929,144 @@ test("property panel groups stroke controls for a path and hides unused text fie
   assert.equal(nodes.get("prop-group-position").classList.contains("hidden"), true);
 });
 
+test("property panel can set shape and text size by width and height", () => {
+  const { editor, nodes } = loadEditor();
+  editor.syncTextToolbar = () => {};
+  editor.syncLineStyleMenu = () => {};
+  editor.syncPropLineStylePreview = () => {};
+  editor.syncPropColorButtons = () => {};
+  editor.connectorFromLabelSelection = () => null;
+  editor.reflowGluedConnectors = () => {};
+  editor.redrawOverlay = () => {};
+  editor.refreshHits = () => {};
+  editor.syncConnectorLabels = () => {};
+  editor.syncTextEditorOverlay = () => {};
+
+  const rect = new FakeNode("box", "rect");
+  rect.setAttribute("x", 10);
+  rect.setAttribute("y", 20);
+  rect.setAttribute("width", 80);
+  rect.setAttribute("height", 40);
+  editor.selected = [rect];
+  editor.updateProps();
+  assert.equal(nodes.get("prop-w").value, "80");
+  assert.equal(nodes.get("prop-h").value, "40");
+  assert.equal(nodes.get("prop-w-field").classList.contains("hidden"), false);
+  nodes.get("prop-w").value = "120";
+  editor.applyProps("prop-w");
+  assert.equal(Number(rect.getAttribute("width")), 120);
+  assert.equal(Number(rect.getAttribute("height")), 40);
+  nodes.get("prop-h").value = "60";
+  editor.applyProps("prop-h");
+  assert.equal(Number(rect.getAttribute("height")), 60);
+  assert.equal(Number(rect.getAttribute("width")), 120);
+
+  const diamond = editor.createFlowShapeElement("diamond");
+  editor.updateFlowShapeGeometry(diamond, "diamond", 10, 20, 100, 50);
+  editor.selected = [diamond];
+  editor.updateProps();
+  assert.equal(nodes.get("prop-w").value, "100");
+  assert.equal(nodes.get("prop-h").value, "50");
+  nodes.get("prop-w").value = "160";
+  editor.applyProps("prop-w");
+  assert.equal(Number(diamond.getAttribute("data-shape-width")), 160);
+  assert.equal(Number(diamond.getAttribute("data-shape-height")), 50);
+
+  const text = new FakeNode("caption", "text");
+  text.style.fontSize = "20px";
+  text.setAttribute("font-size", "20");
+  text.setAttribute("x", "40");
+  text.setAttribute("y", "80");
+  text.getBBox = () => ({ x: 10, y: 20, width: 80, height: 24 });
+  editor.selected = [text];
+  editor.updateProps();
+  assert.equal(nodes.get("prop-w").value, "80");
+  nodes.get("prop-w").value = "160";
+  editor.applyProps("prop-w");
+  assert.equal(Number(text.getAttribute("font-size")), 40);
+  assert.equal(nodes.get("prop-square-field").classList.contains("hidden"), true);
+  clearTimeout(editor._propTimer);
+});
+
+test("moving and resizing update position and size fields live", () => {
+  const { editor, nodes } = loadEditor();
+  editor.syncTextToolbar = () => {};
+  editor.syncLineStyleMenu = () => {};
+  editor.syncPropLineStylePreview = () => {};
+  editor.syncPropColorButtons = () => {};
+  editor.connectorFromLabelSelection = () => null;
+  editor.reflowGluedConnectors = () => {};
+  editor.redrawOverlay = () => {};
+  editor.refreshHits = () => {};
+  editor.syncConnectorLabels = () => {};
+  editor.syncTextEditorOverlay = () => {};
+
+  const rect = new FakeNode("box", "rect");
+  rect.setAttribute("x", 10);
+  rect.setAttribute("y", 20);
+  rect.setAttribute("width", 80);
+  rect.setAttribute("height", 40);
+  editor.selected = [rect];
+  editor.updateProps();
+  editor.moveSet([rect], 15, 5);
+  editor.syncPositionSizeProps();
+  assert.equal(nodes.get("prop-x").value, "25");
+  assert.equal(nodes.get("prop-y").value, "25");
+  rect.setAttribute("width", 120);
+  rect.setAttribute("height", 55);
+  editor.syncPositionSizeProps();
+  assert.equal(nodes.get("prop-w").value, "120");
+  assert.equal(nodes.get("prop-h").value, "55");
+  clearTimeout(editor._propTimer);
+});
+
+test("square buttons force equal width and height from the chosen side", () => {
+  const { editor, nodes } = loadEditor();
+  editor.syncTextToolbar = () => {};
+  editor.syncLineStyleMenu = () => {};
+  editor.syncPropLineStylePreview = () => {};
+  editor.syncPropColorButtons = () => {};
+  editor.connectorFromLabelSelection = () => null;
+  editor.reflowGluedConnectors = () => {};
+  editor.redrawOverlay = () => {};
+  editor.refreshHits = () => {};
+  editor.syncConnectorLabels = () => {};
+  editor.syncTextEditorOverlay = () => {};
+
+  const rect = new FakeNode("box", "rect");
+  rect.setAttribute("x", 10);
+  rect.setAttribute("y", 20);
+  rect.setAttribute("width", 80);
+  rect.setAttribute("height", 40);
+  editor.selected = [rect];
+  editor.updateProps();
+  assert.equal(nodes.get("prop-square-field").classList.contains("hidden"), false);
+  editor.makeSelectedSquare("w");
+  assert.equal(Number(rect.getAttribute("width")), 80);
+  assert.equal(Number(rect.getAttribute("height")), 80);
+  assert.equal(nodes.get("prop-w").value, "80");
+  assert.equal(nodes.get("prop-h").value, "80");
+
+  rect.setAttribute("width", 80);
+  rect.setAttribute("height", 40);
+  editor.makeSelectedSquare("h");
+  assert.equal(Number(rect.getAttribute("width")), 40);
+  assert.equal(Number(rect.getAttribute("height")), 40);
+
+  const diamond = editor.createFlowShapeElement("diamond");
+  editor.updateFlowShapeGeometry(diamond, "diamond", 10, 20, 100, 50);
+  editor.selected = [diamond];
+  editor.makeSelectedSquare("w");
+  assert.equal(Number(diamond.getAttribute("data-shape-width")), 100);
+  assert.equal(Number(diamond.getAttribute("data-shape-height")), 100);
+  clearTimeout(editor._propTimer);
+});
+
 test("editor preferences remember grid, snapping, guides, export settings and arrow mode", () => {
   const key = "svg-manual-editor.preferences.v1";
   const first = loadEditor();
   first.editor.setGridVisible(true, false);
+  first.editor.setRulersVisible(true, false, false);
   first.nodes.get("snap-toggle").checked = true;
   first.nodes.get("smart-toggle").checked = false;
   first.nodes.get("export-format").value = "webp";
@@ -1751,6 +2082,7 @@ test("editor preferences remember grid, snapping, guides, export settings and ar
   assert.ok(saved);
   const second = loadEditor({ storage: { [key]: saved } });
   assert.equal(second.nodes.get("paper-grid").getAttribute("visibility"), "visible");
+  assert.equal(second.nodes.get("workspace").classList.contains("rulers-on"), true);
   assert.equal(second.nodes.get("snap-toggle").checked, true);
   assert.equal(second.nodes.get("smart-toggle").checked, false);
   assert.equal(second.nodes.get("export-format").value, "webp");

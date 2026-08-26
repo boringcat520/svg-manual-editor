@@ -10,5 +10,7 @@ test/**
 *.webp
 figure1_structured_v3.svg
 figure1_structured_v3*.png
+assets/icon.svg
+assets/screenshot.png
 启动编辑器.bat
 install-extension.ps1

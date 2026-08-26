@@ -7,6 +7,7 @@
   const canvas = $("canvas");
   const content = $("content");
   const overlay = $("overlay");
+  const workspace = $("workspace");
   const viewport = $("viewport");
   const paper = $("paper");
   const paperGrid = $("paper-grid");
@@ -94,6 +95,7 @@
   ];
   const RECENT_COLOR_LIMIT = 10;
   const RECENT_SYMBOL_LIMIT = 16;
+  const RULER_SIZE = 24;
   const SPECIAL_SYMBOLS = [
     {
       id: "greek",
@@ -791,6 +793,7 @@
       this.colorMenuTarget = "text";
       this.recentColors = [];
       this.recentSymbols = [];
+      this.rulersVisible = false;
       this.symbolTab = "greek";
       this.symbolMenuVisible = false;
       this.colorDialogCurrent = "#000000";
@@ -803,6 +806,7 @@
       this._eyedropperPointer = null;
       this._eyedropperSnapTimer = null;
       this._eyedropperSnapToken = 0;
+      this._holdRepeat = null;
       this.bind();
     }
 
@@ -925,6 +929,7 @@
         });
       });
       $("btn-fit").addEventListener("click", () => this.fit());
+      $("btn-canvas-size").addEventListener("click", () => this.toggleRulers());
       $("btn-grid").addEventListener("click", () => this.toggleGrid());
       $("snap-toggle").addEventListener("change", () => {
         this.persistPreferences();
@@ -1086,12 +1091,12 @@
         const size = parseFloat($("top-font-size").value);
         if (Number.isFinite(size) && size > 0) this.applyTextFormat("font-size", size);
       });
-      $("top-font-decrease").addEventListener("click", () => this.applyTextFormat("font-size-step", -1));
-      $("top-font-increase").addEventListener("click", () => this.applyTextFormat("font-size-step", 1));
-      $("prop-fs-decrease").addEventListener("click", () => this.nudgePropFontSize(-1));
-      $("prop-fs-increase").addEventListener("click", () => this.nudgePropFontSize(1));
-      $("prop-sw-decrease").addEventListener("click", () => this.nudgePropStrokeWidth(-0.2));
-      $("prop-sw-increase").addEventListener("click", () => this.nudgePropStrokeWidth(0.2));
+      this.bindHoldRepeat("top-font-decrease", () => this.applyTextFormat("font-size-step", -1));
+      this.bindHoldRepeat("top-font-increase", () => this.applyTextFormat("font-size-step", 1));
+      this.bindHoldRepeat("prop-fs-decrease", () => this.nudgePropFontSize(-1));
+      this.bindHoldRepeat("prop-fs-increase", () => this.nudgePropFontSize(1));
+      this.bindHoldRepeat("prop-sw-decrease", () => this.nudgePropStrokeWidth(-0.2));
+      this.bindHoldRepeat("prop-sw-increase", () => this.nudgePropStrokeWidth(0.2));
       TEXT_STYLE_BUTTONS.forEach(([action, ...ids]) => {
         ids.forEach((id) => $(id).addEventListener("click", () => this.applyTextFormat(action)));
       });
@@ -1143,6 +1148,7 @@
       scrollY.addEventListener("pointerdown", (e) => this.startScrollbarDrag(e, "y"));
       window.addEventListener("resize", () => {
         this.updateScrollbars();
+        this.updateRulers();
         if (!$("text-color-menu").classList.contains("hidden")) this.positionColorMenu();
         if (this.symbolMenuVisible) this.positionSymbolMenu();
       });
@@ -1152,7 +1158,10 @@
         this.closeSymbolMenu();
       });
       if (typeof ResizeObserver === "function") {
-        this._resizeObserver = new ResizeObserver(() => this.updateScrollbars());
+        this._resizeObserver = new ResizeObserver(() => {
+          this.updateScrollbars();
+          this.updateRulers();
+        });
         this._resizeObserver.observe(viewport);
       }
       viewport.addEventListener(
@@ -1173,6 +1182,8 @@
       });
 
       window.addEventListener("keydown", (e) => this.onKeyDown(e));
+      window.addEventListener("pointerup", () => this.stopHoldRepeat());
+      window.addEventListener("blur", () => this.stopHoldRepeat());
       window.addEventListener("keyup", (e) => {
         if (e.code === "Space") {
           this.space = false;
@@ -1181,7 +1192,7 @@
       });
 
       textInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
           e.preventDefault();
           this.commitTextEdit();
         }
@@ -1207,11 +1218,15 @@
         "prop-ff",
         "prop-x",
         "prop-y",
+        "prop-w",
+        "prop-h",
       ].forEach((id) => {
         const node = $(id);
         const ev = node.type === "checkbox" || node.tagName === "SELECT" ? "change" : "input";
         node.addEventListener(ev, () => this.applyProps(id));
       });
+      $("prop-square-from-w").addEventListener("click", () => this.makeSelectedSquare("w"));
+      $("prop-square-from-h").addEventListener("click", () => this.makeSelectedSquare("h"));
 
       window.addEventListener("message", (e) => {
         let msg = e.data;
@@ -1291,7 +1306,7 @@
       } else {
         this.status(
           {
-            select: "选择工具：单击选中，拖动移动，框选多个",
+            select: "选择工具：单击选中，拖动移动；拉大小时按住 Ctrl 等比例缩放",
             pan: "平移画布，或按住空格拖动",
             text: "点击画布放置文字，随后可直接输入；选中图形后再点文字，会在图形内部居中添加",
             shape: `拖动绘制${FLOW_SHAPE_LABELS[this.shapeKind] || "图形"}，按住 Shift 约束为等宽高`,
@@ -1326,6 +1341,7 @@
     defaultPreferences() {
       return {
         gridVisible: false,
+        rulersVisible: false,
         snapToGrid: false,
         smartGuides: true,
         exportFormat: "png",
@@ -1341,7 +1357,7 @@
     normalizePreferences(value, base = this.defaultPreferences()) {
       const input = value && typeof value === "object" ? value : {};
       const next = { ...base };
-      ["gridVisible", "snapToGrid", "smartGuides", "propsCollapsed"].forEach((key) => {
+      ["gridVisible", "rulersVisible", "snapToGrid", "smartGuides", "propsCollapsed"].forEach((key) => {
         if (typeof input[key] === "boolean") next[key] = input[key];
       });
       if (["png", "jpeg", "webp", "svg"].includes(input.exportFormat)) {
@@ -1408,6 +1424,7 @@
     currentPreferences() {
       return this.normalizePreferences({
         gridVisible: paperGrid.getAttribute("visibility") === "visible",
+        rulersVisible: this.rulersVisible,
         snapToGrid: $("snap-toggle").checked,
         smartGuides: $("smart-toggle").checked,
         exportFormat: $("export-format").value,
@@ -1467,6 +1484,7 @@
     applyPreferences(value) {
       const preferences = this.normalizePreferences(value, this.currentPreferences());
       this.setGridVisible(preferences.gridVisible, false, false);
+      this.setRulersVisible(preferences.rulersVisible, false, false);
       $("snap-toggle").checked = preferences.snapToGrid;
       $("smart-toggle").checked = preferences.smartGuides;
       $("export-format").value = preferences.exportFormat;
@@ -1634,6 +1652,8 @@
       paperGrid.setAttribute("height", this.docBox.h);
       const zoom = this.docBox.w / w;
       $("zoom-text").textContent = Math.round(zoom * 100) + "%";
+      this.syncCanvasSizeButton();
+      this.updateRulers();
       this.updateScrollbars();
       this.syncTextEditorOverlay();
     }
@@ -1647,6 +1667,170 @@
         h: this.docBox.h + pad * 2,
       };
       this.applyView();
+    }
+
+    canvasSizeLabel(value) {
+      return String(Math.round(Number(value) * 10) / 10);
+    }
+
+    formatRulerLabel(value) {
+      const n = Math.abs(value) < 1e-9 ? 0 : value;
+      if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
+      return String(Math.round(n * 100) / 100);
+    }
+
+    rulerStep(pxPerUnit) {
+      const raw = 70 / Math.max(pxPerUnit, 1e-6);
+      const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+      const n = raw / pow;
+      const nice = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+      return nice * pow;
+    }
+
+    rulerMarks(viewStart, viewSize, lengthPx) {
+      const size = Number(viewSize);
+      const length = Math.max(1, Number(lengthPx) || 1);
+      if (!Number.isFinite(viewStart) || !Number.isFinite(size) || size <= 0) {
+        return { major: 100, minor: 10, ticks: [] };
+      }
+      const pxPerUnit = length / size;
+      const major = this.rulerStep(pxPerUnit);
+      const pow = Math.pow(10, Math.floor(Math.log10(major) + 1e-12));
+      const lead = Math.round(major / pow);
+      const minor = lead === 5 ? major / 5 : major / 10;
+      const mid = major / 2;
+      const first = Math.floor(viewStart / minor) * minor;
+      const last = viewStart + size;
+      const ticks = [];
+      for (let i = 0; i < 480; i += 1) {
+        const world = Number((first + i * minor).toFixed(10));
+        if (world > last + minor * 0.5) break;
+        const px = (world - viewStart) * pxPerUnit;
+        if (px < -1 || px > length + 1) continue;
+        const near = (value, step) => Math.abs(value / step - Math.round(value / step)) < 1e-6;
+        let kind = "minor";
+        let label = "";
+        if (near(world, major)) {
+          kind = "major";
+          label = this.formatRulerLabel(world);
+        } else if (near(world, mid)) {
+          kind = "mid";
+        }
+        ticks.push({ value: world, px, kind, label });
+      }
+      return { major, minor, ticks };
+    }
+
+    syncCanvasSizeButton() {
+      const width = this.canvasSizeLabel(this.docBox.w);
+      const height = this.canvasSizeLabel(this.docBox.h);
+      const button = $("btn-canvas-size");
+      if (button) {
+        button.title = this.rulersVisible
+          ? `隐藏标尺（画布 ${width} × ${height}）`
+          : `显示标尺（画布 ${width} × ${height}）`;
+      }
+    }
+
+    setRulersVisible(visible, announce = true, persist = true) {
+      this.rulersVisible = Boolean(visible);
+      if (workspace) workspace.classList.toggle("rulers-on", this.rulersVisible);
+      const button = $("btn-canvas-size");
+      if (button) {
+        button.classList.toggle("active", this.rulersVisible);
+        button.setAttribute("aria-pressed", String(this.rulersVisible));
+      }
+      this.syncCanvasSizeButton();
+      this.updateRulers();
+      if (persist) this.persistPreferences();
+      if (announce) this.status(this.rulersVisible ? "已显示标尺" : "已隐藏标尺");
+      return this.rulersVisible;
+    }
+
+    toggleRulers() {
+      return this.setRulersVisible(!this.rulersVisible);
+    }
+
+    updateRulers() {
+      const h = $("ruler-h");
+      const v = $("ruler-v");
+      if (!h || !v) return;
+      if (!this.rulersVisible) {
+        if (typeof h.replaceChildren === "function") h.replaceChildren();
+        if (typeof v.replaceChildren === "function") v.replaceChildren();
+        return;
+      }
+      const width = Math.max(1, canvas.clientWidth || (viewport && viewport.clientWidth) || 1);
+      const height = Math.max(1, canvas.clientHeight || (viewport && viewport.clientHeight) || 1);
+      this.renderRuler(h, "h", this.view.x, this.view.w, width);
+      this.renderRuler(v, "v", this.view.y, this.view.h, height);
+    }
+
+    renderRuler(svg, axis, start, size, lengthPx) {
+      if (!svg || typeof document.createElementNS !== "function") return;
+      const horizontal = axis === "h";
+      const length = Math.max(1, lengthPx);
+      svg.setAttribute(
+        "viewBox",
+        horizontal ? `0 0 ${length} ${RULER_SIZE}` : `0 0 ${RULER_SIZE} ${length}`
+      );
+      const kids = [];
+      const paperStart = horizontal ? this.docBox.x : this.docBox.y;
+      const paperSize = horizontal ? this.docBox.w : this.docBox.h;
+      const p1 = ((paperStart - start) / size) * length;
+      const p2 = ((paperStart + paperSize - start) / size) * length;
+      const lo = Math.min(p1, p2);
+      const hi = Math.max(p1, p2);
+      const band = document.createElementNS(NS, "rect");
+      band.setAttribute("fill", "#ece9e2");
+      if (horizontal) {
+        band.setAttribute("x", String(lo));
+        band.setAttribute("y", "0");
+        band.setAttribute("width", String(Math.max(0, hi - lo)));
+        band.setAttribute("height", String(RULER_SIZE));
+      } else {
+        band.setAttribute("x", "0");
+        band.setAttribute("y", String(lo));
+        band.setAttribute("width", String(RULER_SIZE));
+        band.setAttribute("height", String(Math.max(0, hi - lo)));
+      }
+      kids.push(band);
+      const marks = this.rulerMarks(start, size, length);
+      marks.ticks.forEach((mark) => {
+        const tickLen = mark.kind === "major" ? 12 : mark.kind === "mid" ? 8 : 4;
+        const line = document.createElementNS(NS, "line");
+        line.setAttribute("stroke", "#1f1f1f");
+        line.setAttribute("stroke-width", mark.kind === "major" ? "1.1" : "1");
+        if (horizontal) {
+          line.setAttribute("x1", String(mark.px));
+          line.setAttribute("x2", String(mark.px));
+          line.setAttribute("y1", String(RULER_SIZE));
+          line.setAttribute("y2", String(RULER_SIZE - tickLen));
+        } else {
+          line.setAttribute("x1", String(RULER_SIZE));
+          line.setAttribute("x2", String(RULER_SIZE - tickLen));
+          line.setAttribute("y1", String(mark.px));
+          line.setAttribute("y2", String(mark.px));
+        }
+        kids.push(line);
+        if (!mark.label) return;
+        const text = document.createElementNS(NS, "text");
+        text.setAttribute("fill", "#1f1f1f");
+        text.setAttribute("font-size", "9");
+        text.setAttribute("font-family", "Segoe UI, Microsoft YaHei, sans-serif");
+        text.textContent = mark.label;
+        if (horizontal) {
+          text.setAttribute("x", String(mark.px + 3));
+          text.setAttribute("y", "10");
+        } else {
+          const y = mark.px - 3;
+          text.setAttribute("x", "9");
+          text.setAttribute("y", String(y));
+          text.setAttribute("transform", `rotate(-90 9 ${y})`);
+        }
+        kids.push(text);
+      });
+      svg.replaceChildren(...kids);
     }
 
     onWheel(e) {
@@ -2384,7 +2568,7 @@
         return false;
       }
       targets.forEach((el) => {
-        el.textContent = (el.textContent || "") + symbol;
+        this.writeTextElementContent(el, this.textElementPlainText(el) + symbol);
       });
       this.syncConnectorLabels();
       this.redrawOverlay();
@@ -5583,6 +5767,41 @@
           return;
         }
 
+        if (guide.kind === "dimension") {
+          const tick = 4 * scale;
+          if (guide.axis === "x") {
+            addLine(guide.start, guide.cross, guide.end, guide.cross, "dimension");
+            addLine(guide.start, guide.cross - tick, guide.start, guide.cross + tick, "dimension");
+            addLine(guide.end, guide.cross - tick, guide.end, guide.cross + tick, "dimension");
+          } else {
+            addLine(guide.cross, guide.start, guide.cross, guide.end, "dimension");
+            addLine(guide.cross - tick, guide.start, guide.cross + tick, guide.start, "dimension");
+            addLine(guide.cross - tick, guide.end, guide.cross + tick, guide.end, "dimension");
+          }
+          const label = document.createElementNS(NS, "text");
+          label.setAttribute("class", "smart-guide-label dimension");
+          label.setAttribute("font-size", 11 * scale);
+          label.setAttribute(
+            "x",
+            guide.axis === "x"
+              ? (guide.start + guide.end) / 2
+              : guide.align === "start"
+                ? guide.cross + 8 * scale
+                : guide.cross - 8 * scale
+          );
+          label.setAttribute(
+            "y",
+            guide.axis === "x" ? guide.cross - 8 * scale : (guide.start + guide.end) / 2
+          );
+          label.setAttribute(
+            "text-anchor",
+            guide.axis === "x" ? "middle" : guide.align === "start" ? "start" : "end"
+          );
+          label.textContent = guide.label;
+          overlay.appendChild(label);
+          return;
+        }
+
         const tick = 4 * scale;
         if (guide.axis === "x") {
           addLine(guide.start, guide.cross, guide.end, guide.cross, "distance");
@@ -5701,6 +5920,10 @@
         el.setAttribute("rx", radius);
         el.setAttribute("ry", radius);
       }
+    }
+
+    isBoxResizeKind(kind) {
+      return kind === "rect" || kind === "shape" || kind === "text";
     }
 
     addBoxResizeHandles(el, box, kind) {
@@ -5833,6 +6056,9 @@
         } else if (tag === "rect") {
           const rectBox = this.elementBox(el);
           if (rectBox) this.addBoxResizeHandles(el, rectBox, "rect");
+        } else if (tag === "text" && !el.hasAttribute("data-line-label-for")) {
+          const textBox = this.elementBox(el);
+          if (textBox) this.addBoxResizeHandles(el, textBox, "text");
         }
         if (selectionBox && hasArrowMarker(el)) {
           rotatable.push({ el, box: selectionBox });
@@ -5928,7 +6154,7 @@
       c.setAttribute("cy", y);
       c.setAttribute("r", HANDLE_RADIUS);
       const preview = data.kind === "preview";
-      const resize = data.kind === "rect" || data.kind === "shape";
+      const resize = this.isBoxResizeKind(data.kind);
       const routeControl = data.kind === "route-control";
       c.setAttribute(
         "class",
@@ -6014,9 +6240,12 @@
           start: p,
           anchors: data.endpoint ? this.collectConnectionAnchors([data.el]) : [],
           endpointTargets: data.endpoint ? this.collectArrowEndpoints([data.el]) : [],
-          resizeTargets: data.kind === "rect" || data.kind === "shape"
+          resizeTargets: this.isBoxResizeKind(data.kind)
             ? this.collectResizeTargets(data.el)
             : [],
+          resizeOrigin: this.isBoxResizeKind(data.kind)
+            ? this.resizeOriginBox(data.el)
+            : null,
           routeTargets: data.kind === "route-control"
             ? this.connectorRouteSnapTargets(data.el)
             : [],
@@ -6028,7 +6257,7 @@
             ? this.createOrthogonalModel(data.el, data.vertexIndex)
             : null,
         };
-        if (data.kind === "rect" || data.kind === "shape") {
+        if (this.isBoxResizeKind(data.kind)) {
           viewport.style.cursor = this.resizeCursor(data.pos);
         } else if (data.kind === "route-control") {
           viewport.style.cursor = data.axis === "vertical" ? "ew-resize" : "ns-resize";
@@ -6214,6 +6443,7 @@
           };
           this.redrawOverlay();
           this.drawSmartGuides(smart.guides);
+          this.syncPositionSizeProps();
         }
         return;
       }
@@ -6312,7 +6542,8 @@
             x,
             y,
             d.resizeTargets,
-            e.altKey
+            e.altKey,
+            e.ctrlKey || e.metaKey ? d.resizeOrigin : null
           );
         } else if (data.kind === "shape") {
           resizeGuides = this.resizeFlowShape(
@@ -6321,7 +6552,18 @@
             x,
             y,
             d.resizeTargets,
-            e.altKey
+            e.altKey,
+            e.ctrlKey || e.metaKey ? d.resizeOrigin : null
+          );
+        } else if (data.kind === "text") {
+          resizeGuides = this.resizeText(
+            data.el,
+            data.pos,
+            x,
+            y,
+            d.resizeTargets,
+            e.altKey,
+            d.resizeOrigin
           );
         }
         if (data.endpoint) d.endpointAnchor = endpoint.anchor || null;
@@ -6330,8 +6572,14 @@
         }
         if (isConnectorElement(data.el)) this.syncConnectorLabels(data.el);
         this.redrawOverlay();
-        this.drawSmartGuides([...resizeGuides, ...routeGuides, ...(endpoint.guides || [])]);
+        this.drawSmartGuides([
+          ...resizeGuides,
+          ...routeGuides,
+          ...(endpoint.guides || []),
+          ...(this.isBoxResizeKind(data.kind) ? this.boxDimensionGuides(this.elementBox(data.el)) : []),
+        ]);
         this.drawConnectionAnchor(endpoint.anchor);
+        this.syncPositionSizeProps();
         return;
       }
       if (d.type === "create-shape") {
@@ -6352,6 +6600,15 @@
         }
         this.updateFlowShapeGeometry(d.el, d.kind, x, y, w, h);
         this.select([d.el], false);
+        this.drawSmartGuides(this.boxDimensionGuides({
+          left: x,
+          top: y,
+          right: x + w,
+          bottom: y + h,
+          width: w,
+          height: h,
+        }));
+        this.syncPositionSizeProps();
         return;
       }
       if (d.type === "create-arrow") {
@@ -6473,7 +6730,93 @@
       this.setConnectorGlue(data.el, atStart, drag.endpointAnchor);
     }
 
-    resizeRect(el, pos, x, y, targets = [], bypass = false) {
+    boxDimensionGuides(box) {
+      if (!box) return [];
+      const width = Number(box.width);
+      const height = Number(box.height);
+      if (!(width > 0) || !(height > 0)) return [];
+      const scale = this.view.w / Math.max(1, viewport.clientWidth);
+      const gap = 16 * scale;
+      const round = (value) => Math.round(value * 10) / 10;
+      let widthCross = box.bottom + gap;
+      let heightCross = box.left - gap;
+      let heightAlign = "end";
+      if (heightCross < this.view.x + 28 * scale) {
+        heightCross = box.right + gap;
+        heightAlign = "start";
+      }
+      if (widthCross > this.view.y + this.view.h - 18 * scale) {
+        widthCross = box.top - gap;
+      }
+      return [
+        {
+          kind: "dimension",
+          axis: "x",
+          label: `宽 ${round(width)}`,
+          start: box.left,
+          end: box.right,
+          cross: widthCross,
+        },
+        {
+          kind: "dimension",
+          axis: "y",
+          label: `高 ${round(height)}`,
+          start: box.top,
+          end: box.bottom,
+          cross: heightCross,
+          align: heightAlign,
+        },
+      ];
+    }
+
+    resizeOriginBox(el) {
+      const box = this.elementBox(el);
+      if (!box || !(box.width > 0) || !(box.height > 0)) return null;
+      const origin = { x: box.left, y: box.top, w: box.width, h: box.height };
+      if (el.tagName && el.tagName.toLowerCase() === "text") {
+        origin.fontSize = this.textFormatState(el).fontSize;
+        origin.textX = parseFloat(el.getAttribute("x"));
+        origin.textY = parseFloat(el.getAttribute("y"));
+        const textLength = parseFloat(el.getAttribute("textLength"));
+        if (Number.isFinite(textLength)) origin.textLength = textLength;
+        origin.tspans = this.lineTspans(el).map((span) => {
+          const item = {
+            x: parseFloat(span.getAttribute("x")),
+            y: parseFloat(span.getAttribute("y")),
+          };
+          const spanLength = parseFloat(span.getAttribute("textLength"));
+          if (Number.isFinite(spanLength)) item.textLength = spanLength;
+          return item;
+        });
+      }
+      return origin;
+    }
+
+    constrainResizeAspect(pos, origin, rx, ry, rw, rh) {
+      if (!origin || !(origin.w > 0) || !(origin.h > 0)) return { rx, ry, rw, rh };
+      const minSize = 8;
+      const origR = origin.x + origin.w;
+      const origB = origin.y + origin.h;
+      const fromW = pos.includes("e") || pos.includes("w");
+      const fromH = pos.includes("n") || pos.includes("s");
+      let scale = fromW && fromH
+        ? Math.max(rw / origin.w, rh / origin.h)
+        : fromW
+          ? rw / origin.w
+          : rh / origin.h;
+      scale = Math.max(scale, minSize / origin.w, minSize / origin.h);
+      rw = origin.w * scale;
+      rh = origin.h * scale;
+      if (pos.includes("w")) rx = origR - rw;
+      else if (pos.includes("e")) rx = origin.x;
+      else rx = origin.x + (origin.w - rw) / 2;
+      if (pos.includes("n")) ry = origB - rh;
+      else if (pos.includes("s")) ry = origin.y;
+      else ry = origin.y + (origin.h - rh) / 2;
+      return { rx, ry, rw, rh };
+    }
+
+    resizeRect(el, pos, x, y, targets = [], bypass = false, origin = null) {
       let rx = num(el, "x");
       let ry = num(el, "y");
       let rw = num(el, "width");
@@ -6490,11 +6833,18 @@
         rh = b - ry;
       }
       if (pos.includes("s")) rh = Math.max(8, y - ry);
+      if (origin) {
+        const locked = this.constrainResizeAspect(pos, origin, rx, ry, rw, rh);
+        rx = locked.rx;
+        ry = locked.ry;
+        rw = locked.rw;
+        rh = locked.rh;
+      }
 
       const guides = [];
       const scale = this.view.w / Math.max(1, viewport.clientWidth);
       const threshold = Math.max(2, 8 * scale);
-      const smartEnabled = $("smart-toggle").checked && !bypass;
+      const smartEnabled = $("smart-toggle").checked && !bypass && !origin;
       let widthMatch = null;
       let heightMatch = null;
       if (smartEnabled && (pos.includes("w") || pos.includes("e"))) {
@@ -6563,7 +6913,7 @@
       return guides;
     }
 
-    resizeFlowShape(el, pos, x, y, targets = [], bypass = false) {
+    resizeFlowShape(el, pos, x, y, targets = [], bypass = false, origin = null) {
       const box = this.elementBox(el);
       if (!box) return [];
       const proxy = document.createElementNS(NS, "rect");
@@ -6571,7 +6921,7 @@
       proxy.setAttribute("y", box.top);
       proxy.setAttribute("width", box.width);
       proxy.setAttribute("height", box.height);
-      const guides = this.resizeRect(proxy, pos, x, y, targets, bypass);
+      const guides = this.resizeRect(proxy, pos, x, y, targets, bypass, origin);
       this.updateFlowShapeGeometry(
         el,
         el.getAttribute("data-flow-shape") || "rect",
@@ -6580,6 +6930,45 @@
         num(proxy, "width"),
         num(proxy, "height")
       );
+      return guides;
+    }
+
+    resizeText(el, pos, x, y, targets = [], bypass = false, origin = null) {
+      const start = origin || this.resizeOriginBox(el);
+      if (!start || !(start.w > 0) || !(start.h > 0)) return [];
+      const proxy = document.createElementNS(NS, "rect");
+      proxy.setAttribute("x", start.x);
+      proxy.setAttribute("y", start.y);
+      proxy.setAttribute("width", start.w);
+      proxy.setAttribute("height", start.h);
+      const guides = this.resizeRect(proxy, pos, x, y, targets, bypass, start);
+      const fontSize = Number(start.fontSize) || this.textFormatState(el).fontSize || 16;
+      if (!(fontSize > 0)) return guides;
+      const scale = num(proxy, "width") / start.w;
+      const nextSize = Math.min(120, Math.max(1, Math.round(fontSize * scale * 10) / 10));
+      const used = nextSize / fontSize;
+      const box = this.constrainResizeAspect(pos, start, start.x, start.y, start.w * used, start.h * used);
+      el.setAttribute("font-size", nextSize);
+      el.style.fontSize = nextSize + "px";
+      const applyPoint = (node, ox, oy) => {
+        if (!node) return;
+        if (Number.isFinite(ox)) node.setAttribute("x", box.rx + (ox - start.x) * used);
+        if (Number.isFinite(oy)) node.setAttribute("y", box.ry + (oy - start.y) * used);
+      };
+      applyPoint(el, start.textX, start.textY);
+      const spans = this.lineTspans(el);
+      (start.tspans || []).forEach((point, index) => {
+        const span = spans[index];
+        if (!span) return;
+        applyPoint(span, point.x, point.y);
+        if (Number.isFinite(point.textLength)) {
+          span.setAttribute("textLength", point.textLength * used);
+        }
+      });
+      if (Number.isFinite(start.textLength)) {
+        el.setAttribute("textLength", start.textLength * used);
+      }
+      if (this.selected.includes(el)) this.syncTextToolbar();
       return guides;
     }
 
@@ -6749,7 +7138,7 @@
       if (el.style) el.style.opacity = "0";
       const textStyle = getComputedStyle(el);
       textInput.hidden = false;
-      textInput.value = el.textContent || "";
+      textInput.value = this.textElementPlainText(el);
       textInput.style.color = parseColor(
         el.getAttribute("data-text-color-preview") || el.getAttribute("fill") || textStyle.fill
       ) || "#222222";
@@ -6760,8 +7149,8 @@
             ? "right"
             : "left";
       this.syncTextEditorOverlay();
-      textInput.focus();
-      textInput.select();
+      if (typeof textInput.focus === "function") textInput.focus();
+      if (typeof textInput.select === "function") textInput.select();
     }
 
     textEditMetrics(el, screenBox) {
@@ -6814,6 +7203,7 @@
         textInput.style.letterSpacing = textStyle.letterSpacing;
       }
       this._textEditBase = { width: metrics.width, height: metrics.height };
+      this.syncTextEditorLineHeight();
       this.resizeTextInput();
       if (
         typeof textInput.setSelectionRange === "function" &&
@@ -6858,11 +7248,7 @@
       this._textEditBase = null;
       textInput.hidden = true;
       this.clearTextEditingState(el);
-      const value = textInput.value;
-      if (el.querySelector("tspan")) {
-        el.innerHTML = "";
-      }
-      el.textContent = value;
+      this.writeTextElementContent(el, textInput.value);
       this.commit("已修改文字");
     }
 
@@ -7076,16 +7462,70 @@
         align: el.getAttribute("data-text-justify") === "true"
           ? "justify"
           : el.getAttribute("text-anchor") || computed.textAnchor || "start",
-        lineSpacing: Number.isFinite(storedLineSpacing) ? storedLineSpacing : "",
+        lineSpacing: Number.isFinite(storedLineSpacing) && storedLineSpacing > 0 ? storedLineSpacing : 1,
       };
     }
 
     lineTspans(el) {
-      const spans = [...el.querySelectorAll("tspan")];
-      const lineSpans = spans.filter(
-        (span) => span.hasAttribute("x") || span.hasAttribute("y") || span.hasAttribute("dy")
+      const queried = el && typeof el.querySelectorAll === "function" ? [...el.querySelectorAll("tspan")] : [];
+      const nested = queried.length
+        ? queried
+        : [...((el && el.childNodes) || [])].filter((node) => String(node.tagName || "").toLowerCase() === "tspan");
+      const lineSpans = nested.filter(
+        (span) =>
+          span &&
+          typeof span.hasAttribute === "function" &&
+          (span.hasAttribute("x") || span.hasAttribute("y") || span.hasAttribute("dy"))
       );
       return lineSpans.length >= 2 ? lineSpans : [];
+    }
+
+    textElementPlainText(el) {
+      if (!el) return "";
+      const lines = this.lineTspans(el);
+      if (lines.length) return lines.map((span) => span.textContent || "").join("\n");
+      return String(el.textContent || "");
+    }
+
+    writeTextElementContent(el, value) {
+      if (!el) return;
+      const lines = String(value == null ? "" : value)
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .split("\n");
+      const x = parseFloat(el.getAttribute("x"));
+      const y = parseFloat(el.getAttribute("y"));
+      const fontSize = this.textFormatState(el).fontSize || 16;
+      const stored = parseFloat(el.getAttribute("data-line-spacing"));
+      const spacing = Number.isFinite(stored) && stored > 0 ? stored : 1;
+      const anchor = el.getAttribute("text-anchor") || "";
+      if (typeof el.replaceChildren === "function") el.replaceChildren();
+      else if (Array.isArray(el.childNodes)) el.childNodes = [];
+      if (lines.length <= 1) {
+        el.textContent = lines[0] || "";
+        return;
+      }
+      el.textContent = "";
+      if (Array.isArray(el.childNodes)) el.childNodes = [];
+      const baseX = Number.isFinite(x) ? x : 0;
+      const baseY = Number.isFinite(y) ? y : 0;
+      lines.forEach((line, index) => {
+        const span = document.createElementNS(NS, "tspan");
+        span.setAttribute("x", baseX);
+        span.setAttribute("y", baseY + index * fontSize * spacing);
+        span.textContent = line;
+        if (anchor) {
+          span.setAttribute("text-anchor", anchor);
+          if (span.style) span.style.textAnchor = anchor;
+        }
+        el.appendChild(span);
+      });
+    }
+
+    syncTextEditorLineHeight() {
+      if (!this.editingText || !textInput || textInput.hidden) return;
+      const spacing = parseFloat(this.editingText.getAttribute("data-line-spacing"));
+      textInput.style.lineHeight = Number.isFinite(spacing) && spacing > 0 ? String(spacing) : "1.2";
     }
 
     textBaseline(el) {
@@ -7118,13 +7558,15 @@
     }
 
     canAdjustLineSpacing(targets) {
-      return this.textLineSpacingGroups(targets).some(
-        (group) => group.kind === "tspan" || group.items.length >= 2
-      );
+      return (targets || []).some((el) => el && !el.hasAttribute("data-line-label-for"));
     }
 
     applyTextLineSpacing(targets, multiplier) {
       const spacing = Math.max(0.5, Math.min(5, Number(multiplier) || 1));
+      (targets || []).forEach((el) => {
+        if (!el || (el.hasAttribute && el.hasAttribute("data-line-label-for"))) return;
+        el.setAttribute("data-line-spacing", spacing);
+      });
       this.textLineSpacingGroups(targets).forEach((group) => {
         if (group.kind === "tspan") {
           const state = this.textFormatState(group.parent);
@@ -7150,6 +7592,8 @@
           line.setAttribute("data-line-spacing", spacing);
         });
       });
+      this.syncTextEditorLineHeight();
+      this.resizeTextInput();
     }
 
     syncTextToolbar() {
@@ -7178,7 +7622,7 @@
         $("top-font-size").value = "";
         $("top-font-family").value = "";
         TEXT_LINE_SPACING_IDS.forEach((id) => {
-          $(id).value = "";
+          $(id).value = "1";
         });
         [...styleIds, ...alignIds].forEach((id) => {
           $(id).classList.remove("active");
@@ -7310,6 +7754,54 @@
       const x = anchor === "start" ? area.box.left + inset : anchor === "end" ? area.box.right - inset : area.box.cx;
       el.setAttribute("x", x);
       spans.filter((span) => span.hasAttribute("x")).forEach((span) => span.setAttribute("x", x));
+    }
+
+    bindHoldRepeat(id, action) {
+      const button = $(id);
+      if (!button || typeof button.addEventListener !== "function") return;
+      button.addEventListener("pointerdown", (e) => {
+        if (e.button && e.button !== 0) return;
+        if (button.disabled) return;
+        if (typeof e.preventDefault === "function") e.preventDefault();
+        if (typeof button.setPointerCapture === "function" && e.pointerId != null) {
+          try {
+            button.setPointerCapture(e.pointerId);
+          } catch (_) {
+            /* ignore */
+          }
+        }
+        this.startHoldRepeat(button, action);
+      });
+      button.addEventListener("pointerup", () => this.stopHoldRepeat());
+      button.addEventListener("pointercancel", () => this.stopHoldRepeat());
+      button.addEventListener("lostpointercapture", () => this.stopHoldRepeat());
+    }
+
+    startHoldRepeat(button, action) {
+      this.stopHoldRepeat();
+      if (!button || button.disabled || typeof action !== "function") return;
+      action();
+      let interval = 90;
+      const tick = () => {
+        if (!this._holdRepeat || (this._holdRepeat.button && this._holdRepeat.button.disabled)) {
+          this.stopHoldRepeat();
+          return;
+        }
+        action();
+        interval = Math.max(28, Math.round(interval * 0.86));
+        this._holdRepeat.timer = setTimeout(tick, interval);
+      };
+      this._holdRepeat = {
+        button,
+        action,
+        timer: setTimeout(tick, 380),
+      };
+    }
+
+    stopHoldRepeat() {
+      if (!this._holdRepeat) return;
+      clearTimeout(this._holdRepeat.timer);
+      this._holdRepeat = null;
     }
 
     nudgePropFontSize(delta) {
@@ -7477,7 +7969,7 @@
         );
       }
 
-      $("prop-text").value = tag === "text" ? el.textContent || "" : "";
+      $("prop-text").value = tag === "text" ? this.textElementPlainText(el) : "";
       $("prop-text").disabled = tag !== "text" || this.selected.length > 1;
       this.togglePropGroup(
         "prop-text-wrap",
@@ -7486,18 +7978,221 @@
 
       const positionable = new Set(["rect", "text", "image", "circle", "ellipse", "line"]);
       const positionDisabled = this.selected.length > 1 || (!positionable.has(tag) && !flowShape);
-      $("prop-x").disabled = positionDisabled;
-      $("prop-y").disabled = positionDisabled;
-      const xAttr = tag === "circle" || tag === "ellipse" ? "cx" : tag === "line" ? "x1" : "x";
-      const yAttr = tag === "circle" || tag === "ellipse" ? "cy" : tag === "line" ? "y1" : "y";
-      const positionBox = flowShape ? this.elementBox(el) : null;
-      $("prop-x").value = Math.round(positionBox ? positionBox.left : num(el, xAttr));
-      $("prop-y").value = Math.round(positionBox ? positionBox.top : num(el, yAttr));
-
+      this.syncPositionSizeProps();
       this.togglePropGroup("prop-group-fill", fillTags.has(tag));
       this.togglePropGroup("prop-group-stroke", canStroke);
       this.togglePropGroup("prop-group-text", Boolean(textEl));
       this.togglePropGroup("prop-group-position", !positionDisabled);
+    }
+
+    syncPositionSizeProps() {
+      const xNode = $("prop-x");
+      const yNode = $("prop-y");
+      const wNode = $("prop-w");
+      const hNode = $("prop-h");
+      if (!xNode || !yNode || !wNode || !hNode) return;
+      const active = typeof document !== "undefined" && document.activeElement;
+      if (
+        active &&
+        (active.id === "prop-x" || active.id === "prop-y" || active.id === "prop-w" || active.id === "prop-h")
+      ) {
+        return;
+      }
+      if (!this.selected.length) return;
+      const el = this.selected[0];
+      if (!el || !el.tagName) return;
+      const tag = el.tagName.toLowerCase();
+      const flowShape = el.getAttribute && el.getAttribute("data-flow-shape");
+      const positionable = new Set(["rect", "text", "image", "circle", "ellipse", "line"]);
+      const positionDisabled = this.selected.length > 1 || (!positionable.has(tag) && !flowShape);
+      xNode.disabled = positionDisabled;
+      yNode.disabled = positionDisabled;
+      if (positionDisabled) {
+        wNode.disabled = true;
+        hNode.disabled = true;
+        $("prop-square-from-w").disabled = true;
+        $("prop-square-from-h").disabled = true;
+        this.togglePropGroup("prop-w-field", false);
+        this.togglePropGroup("prop-h-field", false);
+        this.togglePropGroup("prop-square-field", false);
+        return;
+      }
+      const xAttr = tag === "circle" || tag === "ellipse" ? "cx" : tag === "line" ? "x1" : "x";
+      const yAttr = tag === "circle" || tag === "ellipse" ? "cy" : tag === "line" ? "y1" : "y";
+      const positionBox = flowShape ? this.elementBox(el) : null;
+      const round = (value) => String(Math.round(Number(value) * 10) / 10);
+      const xValue = positionBox
+        ? positionBox.left
+        : flowShape && el.hasAttribute("data-shape-x")
+          ? num(el, "data-shape-x")
+          : num(el, xAttr);
+      const yValue = positionBox
+        ? positionBox.top
+        : flowShape && el.hasAttribute("data-shape-y")
+          ? num(el, "data-shape-y")
+          : num(el, yAttr);
+      xNode.value = round(xValue);
+      yNode.value = round(yValue);
+      const size = this.currentSize(el);
+      const sizeDisabled =
+        this.selected.length > 1 ||
+        !size ||
+        tag === "line" ||
+        (el.hasAttribute && el.hasAttribute("data-line-label-for"));
+      wNode.disabled = sizeDisabled;
+      hNode.disabled = sizeDisabled;
+      wNode.value = size && !sizeDisabled ? round(size.w) : "";
+      hNode.value = size && !sizeDisabled ? round(size.h) : "";
+      this.togglePropGroup("prop-w-field", !sizeDisabled);
+      this.togglePropGroup("prop-h-field", !sizeDisabled);
+      const squareDisabled = sizeDisabled || !this.canForceEqualSize(el);
+      $("prop-square-from-w").disabled = squareDisabled;
+      $("prop-square-from-h").disabled = squareDisabled;
+      this.togglePropGroup("prop-square-field", !squareDisabled);
+    }
+
+    canForceEqualSize(el) {
+      if (!el || !el.tagName) return false;
+      if (el.hasAttribute && el.hasAttribute("data-line-label-for")) return false;
+      const tag = el.tagName.toLowerCase();
+      if (tag === "text" || tag === "line") return false;
+      return Boolean(el.getAttribute && el.getAttribute("data-flow-shape")) ||
+        tag === "rect" ||
+        tag === "image" ||
+        tag === "ellipse" ||
+        tag === "circle";
+    }
+
+    currentSize(el) {
+      if (!el) return null;
+      const tag = el.tagName.toLowerCase();
+      const box = this.elementBox(el);
+      if (box && box.width > 0 && box.height > 0) {
+        return { x: box.left, y: box.top, w: box.width, h: box.height };
+      }
+      if (el.hasAttribute("data-shape-width") && el.hasAttribute("data-shape-height")) {
+        const w = num(el, "data-shape-width");
+        const h = num(el, "data-shape-height");
+        if (w > 0 && h > 0) {
+          return { x: num(el, "data-shape-x"), y: num(el, "data-shape-y"), w, h };
+        }
+      }
+      if (tag === "rect" || tag === "image") {
+        const w = num(el, "width");
+        const h = num(el, "height");
+        if (w > 0 && h > 0) return { x: num(el, "x"), y: num(el, "y"), w, h };
+      }
+      if (tag === "ellipse") {
+        const w = num(el, "rx") * 2;
+        const h = num(el, "ry") * 2;
+        if (w > 0 && h > 0) {
+          return { x: num(el, "cx") - w / 2, y: num(el, "cy") - h / 2, w, h };
+        }
+      }
+      if (tag === "circle") {
+        const r = num(el, "r");
+        if (r > 0) {
+          return { x: num(el, "cx") - r, y: num(el, "cy") - r, w: r * 2, h: r * 2 };
+        }
+      }
+      return null;
+    }
+
+    applySelectedSize(changedId) {
+      const el = this.selected[0];
+      if (!el || el.hasAttribute("data-line-label-for")) return;
+      const tag = el.tagName.toLowerCase();
+      const current = this.currentSize(el);
+      const typed = parseFloat($(changedId).value);
+      if (!current || !Number.isFinite(typed) || typed <= 0) return;
+      let width = changedId === "prop-w" ? typed : current.w;
+      let height = changedId === "prop-h" ? typed : current.h;
+      if (tag === "circle" && !el.hasAttribute("data-flow-shape")) {
+        width = typed;
+        height = typed;
+      }
+      this.setElementSize(el, Math.max(1, width), Math.max(1, height), changedId === "prop-h" ? "h" : "w");
+    }
+
+    makeSelectedSquare(axis) {
+      if (this.selected.length !== 1) return;
+      const el = this.selected[0];
+      if (!this.canForceEqualSize(el)) return;
+      const current = this.currentSize(el);
+      if (!current) return;
+      const size = Math.max(1, axis === "h" ? current.h : current.w);
+      this.setElementSize(el, size, size, axis);
+      this.syncConnectorLabels();
+      this.redrawOverlay();
+      this.syncTextEditorOverlay();
+      this.refreshHits();
+      this.syncPositionSizeProps();
+      clearTimeout(this._propTimer);
+      this._propTimer = setTimeout(() => this.commit("已等高等宽"), 250);
+    }
+
+    setElementSize(el, width, height, scaleAxis = "w") {
+      if (!el) return;
+      const tag = el.tagName.toLowerCase();
+      const current = this.currentSize(el);
+      width = Math.max(1, width);
+      height = Math.max(1, height);
+
+      if (el.hasAttribute("data-flow-shape")) {
+        const x = current ? current.x : num(el, "data-shape-x");
+        const y = current ? current.y : num(el, "data-shape-y");
+        this.updateFlowShapeGeometry(
+          el,
+          el.getAttribute("data-flow-shape") || "rect",
+          x,
+          y,
+          width,
+          height
+        );
+        this.reflowGluedConnectors([el]);
+        return;
+      }
+      if (tag === "text") {
+        const origin = this.resizeOriginBox(el) || (current && {
+          x: current.x,
+          y: current.y,
+          w: current.w,
+          h: current.h,
+          fontSize: this.textFormatState(el).fontSize,
+          textX: parseFloat(el.getAttribute("x")),
+          textY: parseFloat(el.getAttribute("y")),
+          tspans: this.lineTspans(el).map((span) => ({
+            x: parseFloat(span.getAttribute("x")),
+            y: parseFloat(span.getAttribute("y")),
+          })),
+        });
+        if (!origin || !(origin.w > 0) || !(origin.h > 0)) return;
+        const scale = scaleAxis === "h" ? height / origin.h : width / origin.w;
+        this.resizeText(
+          el,
+          "se",
+          origin.x + origin.w * scale,
+          origin.y + origin.h * scale,
+          [],
+          true,
+          origin
+        );
+        return;
+      }
+      if (tag === "rect" || tag === "image") {
+        el.setAttribute("width", width);
+        el.setAttribute("height", height);
+        if (tag === "rect") this.reflowGluedConnectors([el]);
+        return;
+      }
+      if (tag === "ellipse") {
+        el.setAttribute("rx", width / 2);
+        el.setAttribute("ry", height / 2);
+        return;
+      }
+      if (tag === "circle") {
+        el.setAttribute("r", width / 2);
+      }
     }
 
     applyProps(changedId) {
@@ -7509,7 +8204,7 @@
       this.selected.forEach((el) => {
         const tag = el.tagName.toLowerCase();
         if (changedId === "prop-text" && !$("prop-text").disabled && tag === "text") {
-          el.textContent = $("prop-text").value;
+          this.writeTextElementContent(el, $("prop-text").value);
         } else if (changedId === "prop-fill-none" && fillTags.has(tag)) {
           const fill = $("prop-fill-none").checked ? "none" : $("prop-fill").value;
           el.setAttribute("fill", fill);
@@ -7566,6 +8261,8 @@
             const dy = changeX ? 0 : value - num(el, "y1");
             moveBy(el, dx, dy);
           }
+        } else if ((changedId === "prop-w" || changedId === "prop-h") && this.selected.length === 1) {
+          this.applySelectedSize(changedId);
         }
       });
       this.syncConnectorLabels();

@@ -56,6 +56,7 @@
         <button id="btn-undo" class="btn" type="button" title="Ctrl+Z">撤销</button>
         <button id="btn-redo" class="btn" type="button" title="Ctrl+Y">重做</button>
         <button id="btn-fit" class="btn" type="button">适应画布</button>
+        <button id="btn-canvas-size" class="btn canvas-size-btn" type="button" aria-pressed="false" title="显示标尺" aria-label="标尺">标尺</button>
         <button id="btn-grid" class="btn" type="button" aria-pressed="false">网格线</button>
         <label class="toggle">
           <input id="snap-toggle" type="checkbox" />
@@ -135,11 +136,14 @@
         </button>
         <span class="format-separator" aria-hidden="true"></span>
         <label class="format-line-spacing" title="行间距">
-          <span class="line-spacing-glyph" aria-hidden="true"><b>↕</b><span><i></i><i></i><i></i></span></span>
+          <svg class="line-spacing-glyph" viewBox="0 0 20 16" aria-hidden="true" focusable="false">
+            <path d="M4 1.6v12.8M2.3 3.4 4 1.5l1.7 1.9M2.3 12.6 4 14.5l1.7-1.9" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.4 3.1h10.2M8.4 8h7.4M8.4 12.9h10.2" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/>
+          </svg>
           <select id="top-line-spacing" aria-label="行间距" disabled>
-            <option value="">行距</option>
             <option value="1">1.0×</option>
             <option value="1.15">1.15×</option>
+            <option value="1.2">1.2×</option>
             <option value="1.5">1.5×</option>
             <option value="2">2.0×</option>
             <option value="2.5">2.5×</option>
@@ -235,7 +239,10 @@
       <button id="btn-delete" class="tool danger" type="button" title="Delete">删除</button>
     </aside>
 
-    <main class="workspace">
+    <main id="workspace" class="workspace">
+      <div id="ruler-corner" class="ruler-corner" aria-hidden="true"></div>
+      <svg id="ruler-h" class="ruler ruler-h" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+      <svg id="ruler-v" class="ruler ruler-v" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
       <div id="viewport">
         <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -410,11 +417,14 @@
             </div>
             <label class="prop-line-spacing-field">行距
               <span class="format-line-spacing">
-                <span class="line-spacing-glyph" aria-hidden="true"><b>↕</b><span><i></i><i></i><i></i></span></span>
+                <svg class="line-spacing-glyph" viewBox="0 0 20 16" aria-hidden="true" focusable="false">
+                  <path d="M4 1.6v12.8M2.3 3.4 4 1.5l1.7 1.9M2.3 12.6 4 14.5l1.7-1.9" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M8.4 3.1h10.2M8.4 8h7.4M8.4 12.9h10.2" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/>
+                </svg>
                 <select id="prop-line-spacing" aria-label="行间距" disabled>
-                  <option value="">行距</option>
                   <option value="1">1.0×</option>
                   <option value="1.15">1.15×</option>
+                  <option value="1.2">1.2×</option>
                   <option value="1.5">1.5×</option>
                   <option value="2">2.0×</option>
                   <option value="2.5">2.5×</option>
@@ -426,10 +436,19 @@
         </section>
 
         <section id="prop-group-position" class="prop-group">
-          <h3>位置</h3>
+          <h3>位置与大小</h3>
           <div class="prop-grid">
+            <label id="prop-w-field">宽 <input id="prop-w" type="number" min="1" step="1" /></label>
+            <label id="prop-h-field">高 <input id="prop-h" type="number" min="1" step="1" /></label>
             <label>X <input id="prop-x" type="number" step="1" /></label>
             <label>Y <input id="prop-y" type="number" step="1" /></label>
+            <div id="prop-square-field" class="prop-square-field">
+              <span class="prop-field-label">等高等宽</span>
+              <div class="prop-square-actions">
+                <button id="prop-square-from-w" class="btn" type="button" title="保持当前宽度，把高度改成与宽度相同">以宽为准</button>
+                <button id="prop-square-from-h" class="btn" type="button" title="保持当前高度，把宽度改成与高度相同">以高为准</button>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -451,7 +470,7 @@
           <li>折线工具依次单击加点，双击/Enter 结束</li>
           <li>折线终点可吸附到图形边缘，不会额外插入接近段或折点</li>
           <li>选中图形后点击「文字」，会在图形内部居中生成文本并直接输入</li>
-          <li>轻点文字只选中；明确拖动才移动；双击或 Enter/F2 编辑并复制内容</li>
+          <li>轻点文字只选中；明确拖动才移动；双击或 Enter/F2 编辑；编辑时回车换行，Esc 取消，Ctrl+Enter 确认</li>
           <li>顶部文字栏可修改颜色、字体、字号、字形和对齐方式</li>
           <li>顶部支持左/中/右/两端对齐及多行文字行间距</li>
           <li>Delete 删除，Ctrl+Z 撤销</li>
