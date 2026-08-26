@@ -1,11 +1,11 @@
 {
   "name": "svg-manual-editor",
   "displayName": "SVG 手动编辑器",
-  "description": "比 PPT 更顺手的科研矢量绘图：搭配 Cursor / VS Code Agent 出图，不满意就在画布上手动改",
-  "version": "0.1.13",
+  "description": "PPT、Visio 没法跟 AI 协作改科研图；用 SVG 让 Agent 出图、你在画布上精修，同一份矢量来回改",
+  "version": "0.1.14",
   "publisher": "boringcat520",
   "icon": "assets/icon.png",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "https://github.com/boringcat520/svg-manual-editor.git"
