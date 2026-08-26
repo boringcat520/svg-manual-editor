@@ -29,12 +29,28 @@ PPT 改一张机制图，对齐靠眼、箭头易歪、放大就糊、投稿还�
 
 Agent 负责「从零到有、从有到多种方案」，你负责「像改 PPT 一样把最后 10% 摆到位」。这才是研究生真正用得上的出图方式。
 
+## 请作者喝杯咖啡
+
+这个编辑器是开源的，我希望研究生画机制图、技术路线、实验流程时，少在 PPT 里对格子，少被 AI 位图锁死。
+
+如果你用它顺利改完一版图、少熬了一会儿，或者只是觉得「比 PPT 顺手」——扫下面任意一个码请我喝杯咖啡，就是最大的鼓励。赞赏不在多少，而在让这件事能继续做下去：更好的对齐、更稳的箭头、你提的下一个功能。
+
+想加什么，也可以扫码时顺手说一声。谢谢你愿意让科研绘图更好用一点。
+
+<p align="center">
+  <img src="assets/wechat-pay.jpg" alt="微信支付收款码" width="280">
+  &nbsp;&nbsp;
+  <img src="assets/wechat-reward.jpg" alt="微信赞赏码" width="280">
+</p>
+
+<p align="center"><sub>左：微信支付收款码　右：微信赞赏码（周六不摸鱼）</sub></p>
+
 ## 安装 VSIX
 
-从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.10.vsix`，然后任选一种方式安装：
+从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.11.vsix`，然后任选一种方式安装：
 
 - **Cursor / VS Code：** 扩展面板 → `⋯` → **Install from VSIX…**，选中下载的 `.vsix`
-- **命令行：** `code --install-extension svg-manual-editor-0.1.10.vsix`（Cursor 可用 `cursor --install-extension`）
+- **命令行：** `code --install-extension svg-manual-editor-0.1.11.vsix`（Cursor 可用 `cursor --install-extension`）
 
 安装后重启编辑器，在资源管理器里对 `.svg` 右键 → **用 SVG 手动编辑器打开**。
 

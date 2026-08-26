@@ -9,6 +9,8 @@ test/**
 *.jpg
 *.jpeg
 *.webp
+!assets/wechat-pay.jpg
+!assets/wechat-reward.jpg
 figure1_structured_v3.svg
 figure1_structured_v3*.png
 assets/icon.svg
