@@ -1,6 +1,6 @@
-# SVG 手动编辑器
+# SVG手动编辑器
 
-<p align="center"><img src="assets/icon.png" width="144" alt="SVG 手动编辑器图标"></p>
+<p align="center"><img src="assets/icon.png" width="144" alt="SVG手动编辑器图标"></p>
 
 **PPT 和 Visio 画科研图，真正过不去的不是慢，而是没法跟 AI 协作。**
 
@@ -10,7 +10,7 @@
 
 专为研究生科研绘图：机制图、流程图、框架图、实验方案图，任意形式都可以。
 
-<p align="center"><img src="assets/screenshot-demo.png" alt="SVG 手动编辑器界面：步骤一至步骤五示例流程图、顶边与左边标尺、图形工具与属性栏"></p>
+<p align="center"><img src="assets/screenshot-demo.png" alt="SVG手动编辑器界面：步骤一至步骤五示例流程图、顶边与左边标尺、图形工具与属性栏"></p>
 
 ## PPT、Visio 为什么接不上 AI
 
@@ -52,14 +52,14 @@ Agent 负责「从零到有、从有到多种方案」，你负责把最后 10% 
 
 ## 安装 VSIX
 
-从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.24.vsix`，然后任选一种方式安装：
+从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.25.vsix`，然后任选一种方式安装：
 
 - **Cursor / VS Code：** 扩展面板 → `⋯` → **Install from VSIX…**，选中下载的 `.vsix`
-- **命令行：** `code --install-extension svg-manual-editor-0.1.24.vsix`（Cursor 可用 `cursor --install-extension`）
+- **命令行：** `code --install-extension svg-manual-editor-0.1.25.vsix`（Cursor 可用 `cursor --install-extension`）
 
-安装后重启编辑器。左侧活动栏会出现 **SVG 手动编辑器** 图标，点击即可打开文件页：还没有打开 SVG 时，可以新建或打开项目里的文件；页面会列出工作区全部 SVG（带修改时间）和最近打开的文件（带打开时间）。也可以在资源管理器里对 `.svg` 右键 → **用 SVG 手动编辑器打开**。
+安装后重启编辑器。左侧活动栏会出现 **SVG手动编辑器** 图标，点击即可打开文件页：还没有打开 SVG 时，可以新建或打开项目里的文件；页面会列出工作区全部 SVG（带修改时间）和最近打开的文件（带打开时间）。也可以在资源管理器里对 `.svg` 右键 → **用 SVG手动编辑器打开**。
 
-本地开发也可在本目录运行 `.\install-extension.ps1`，或按 `F5` 启动「运行 SVG 手动编辑器扩展」。
+本地开发也可在本目录运行 `.\install-extension.ps1`，或按 `F5` 启动「运行 SVG手动编辑器扩展」。
 
 扩展使用自管理 SVG 文档，绕过 Cursor 某些版本恢复自定义文本编辑器时的 `Unable to retrieve document` 问题。你在画布上的修改会自动写回当前 SVG；Agent 改了同一个文件，打开的画布也会自动刷新——人和 AI 始终在改同一张矢量图。
 

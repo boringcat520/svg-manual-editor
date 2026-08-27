@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">SVG 手动编辑器</title>
+  <title id="title">SVG手动编辑器</title>
   <desc id="desc">由流程图形、正交连接线和矢量节点构成的专业 SVG 编辑器图标</desc>
   <defs>
     <linearGradient id="background" x1="76" y1="54" x2="438" y2="466" gradientUnits="userSpaceOnUse">

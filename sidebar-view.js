@@ -252,7 +252,7 @@ class SvgSidebarViewProvider {
       canSelectMany: false,
       defaultUri: folder && folder.uri,
       filters: { "SVG 矢量图": ["svg"] },
-      openLabel: "用 SVG 手动编辑器打开",
+      openLabel: "用 SVG手动编辑器打开",
     });
     if (!picked || !picked[0]) return;
     await this.openSvgUri(picked[0]);
