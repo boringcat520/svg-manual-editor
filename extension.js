@@ -182,7 +182,10 @@ class SvgManualEditorProvider {
   async resolveCustomEditor(document, webviewPanel) {
     webviewPanel.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "editor")],
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.context.extensionUri, "editor"),
+        vscode.Uri.joinPath(this.context.extensionUri, "assets"),
+      ],
     };
     document.addPanel(webviewPanel);
     webviewPanel.onDidDispose(() => document.removePanel(webviewPanel));
@@ -315,6 +318,9 @@ class SvgManualEditorProvider {
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, "editor", "editor.js")
     );
+    const iconUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, "assets", "icon.png")
+    );
     const htmlPath = vscode.Uri.joinPath(
       this.context.extensionUri,
       "editor",
@@ -335,6 +341,7 @@ class SvgManualEditorProvider {
     );
     html = html.replace('href="editor.css"', `href="${cssUri}"`);
     html = html.replace('src="editor.js"', `nonce="${nonce}" src="${jsUri}"`);
+    html = html.replace('src="../assets/icon.png"', `src="${iconUri}"`);
     html = html.replace("<body>", '<body class="in-vscode">');
     html = html.replace("<!-- BOOT -->", "");
     return html;

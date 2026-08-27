@@ -470,7 +470,14 @@ test("bottom and right canvas scrollbars are connected to viewBox navigation", (
 test("right property sidebar has a persistent collapse control", () => {
   assert.match(htmlSource, /id="props-panel"/);
   assert.match(htmlSource, /id="btn-props-toggle"/);
-  assert.match(cssSource, /#app\.props-collapsed\s*\{[^}]*grid-template-columns:\s*72px 1fr 38px/s);
+  assert.match(cssSource, /#app\.props-collapsed\s*\{[^}]*grid-template-columns:\s*72px minmax\(0, 1fr\) 38px/s);
+  assert.match(cssSource, /@media \(max-width: 900px\)/);
+  assert.match(cssSource, /\.top-actions\s*\{[^}]*flex-wrap:\s*wrap/s);
+  assert.match(cssSource, /\.topbar \.brand-text\s*\{\s*display:\s*none/);
+  assert.match(htmlSource, /src="\.\.\/assets\/icon\.png"/);
+  assert.match(cssSource, /body\.in-vscode \.file-name\s*\{\s*display:\s*none/);
+  assert.match(extensionSource, /joinPath\(this\.context\.extensionUri, "assets", "icon.png"\)/);
+  assert.doesNotMatch(cssSource, /@media \(max-width: 900px\)[\s\S]{0,400}grid-template-rows:\s*56px/);
   assert.match(editorSource, /togglePropsPanel\(/);
   assert.match(editorSource, /svg-editor-props-collapsed/);
 });

@@ -162,6 +162,10 @@ test("sidebar page offers new/open plus recent and project lists", () => {
   assert.match(js, /type === "active"/);
   assert.match(js, /revealActiveFile/);
   assert.match(css, /\.row\.is-file\.is-active/);
+  assert.match(css, /border-radius: 5px/);
+  assert.match(css, /\.row\.is-file \.row-name[\s\S]*font-weight: 600/);
+  assert.match(css, /\.block h2[\s\S]*letter-spacing: 0/);
+  assert.match(css, /\.folder-count[\s\S]*font-size: 13px/);
   assert.doesNotMatch(css, /\.file-list li \+ li \{[\s\S]*border-top/);
   assert.doesNotMatch(css, /\.tree-file \+ \.tree-file \{[\s\S]*border-top/);
   const view = fs.readFileSync(path.join(__dirname, "..", "sidebar-view.js"), "utf8");
