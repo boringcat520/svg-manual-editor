@@ -52,12 +52,12 @@ Agent 负责「从零到有、从有到多种方案」，你负责把最后 10% 
 
 ## 安装 VSIX
 
-从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.14.vsix`，然后任选一种方式安装：
+从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.24.vsix`，然后任选一种方式安装：
 
 - **Cursor / VS Code：** 扩展面板 → `⋯` → **Install from VSIX…**，选中下载的 `.vsix`
-- **命令行：** `code --install-extension svg-manual-editor-0.1.14.vsix`（Cursor 可用 `cursor --install-extension`）
+- **命令行：** `code --install-extension svg-manual-editor-0.1.24.vsix`（Cursor 可用 `cursor --install-extension`）
 
-安装后重启编辑器，在资源管理器里对 `.svg` 右键 → **用 SVG 手动编辑器打开**。
+安装后重启编辑器。左侧活动栏会出现 **SVG 手动编辑器** 图标，点击即可打开文件页：还没有打开 SVG 时，可以新建或打开项目里的文件；页面会列出工作区全部 SVG（带修改时间）和最近打开的文件（带打开时间）。也可以在资源管理器里对 `.svg` 右键 → **用 SVG 手动编辑器打开**。
 
 本地开发也可在本目录运行 `.\install-extension.ps1`，或按 `F5` 启动「运行 SVG 手动编辑器扩展」。
 
@@ -71,6 +71,11 @@ Agent 负责「从零到有、从有到多种方案」，你负责把最后 10% 
 
 | 操作 | 方式 |
 | --- | --- |
+| 打开侧边栏 | 点击 VS Code / Cursor 左侧活动栏的 SVG 图标 |
+| 新建或打开 SVG | 侧边栏「新建 SVG」「打开文件」，或标题栏对应按钮 |
+| 从项目列表打开 | 侧边栏按文件夹分组列出工作区 `.svg`，显示修改时间；点击即用本编辑器打开 |
+| 从最近打开 | 侧边栏列出最近用本编辑器打开的文件，显示打开时间 |
+| 右键文件 | 打开、重命名、删除、在文件资源管理器中显示 |
 | 移动方框（带框内文字） | 选择工具下拖动矩形 |
 | 添加流程图图形 | 打开左侧「图形」二级菜单，可选矩形、圆角矩形、圆/椭圆、判断菱形、输入输出平行四边形和开始结束终止符 |
 | 显示标尺 | 点击顶部「标尺」按钮，在画布顶边和左边显示随缩放、平移更新的标尺 |

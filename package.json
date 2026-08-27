@@ -2,7 +2,7 @@
   "name": "svg-manual-editor",
   "displayName": "SVG 手动编辑器",
   "description": "PPT、Visio 没法跟 AI 协作改科研图；用 SVG 让 Agent 出图、你在画布上精修，同一份矢量来回改",
-  "version": "0.1.14",
+  "version": "0.1.24",
   "publisher": "boringcat520",
   "icon": "assets/icon.png",
   "license": "GPL-3.0-only",
@@ -32,11 +32,15 @@
   ],
   "activationEvents": [
     "onCustomEditor:svgManualEditor.editor",
-    "onCommand:svgManualEditor.open"
+    "onCommand:svgManualEditor.open",
+    "onCommand:svgManualEditor.newFile",
+    "onCommand:svgManualEditor.openFile",
+    "onCommand:svgManualEditor.refreshSidebar",
+    "onView:svgManualEditor.sidebar"
   ],
   "main": "./extension.js",
   "scripts": {
-    "check": "node --check extension.js && node --check editor/editor.js",
+    "check": "node --check extension.js && node --check editor/editor.js && node --check sidebar-model.js && node --check sidebar-view.js && node --check sidebar/sidebar.js",
     "test": "npm run check && node --test test/*.test.js",
     "package": "npx --yes @vscode/vsce package --no-dependencies",
     "publish": "npx --yes @vscode/vsce publish --no-dependencies"
@@ -59,6 +63,21 @@
         "command": "svgManualEditor.open",
         "title": "用 SVG 手动编辑器打开",
         "icon": "$(edit)"
+      },
+      {
+        "command": "svgManualEditor.newFile",
+        "title": "新建 SVG",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "svgManualEditor.openFile",
+        "title": "打开 SVG",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "svgManualEditor.refreshSidebar",
+        "title": "刷新 SVG 列表",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -74,6 +93,42 @@
           "command": "svgManualEditor.open",
           "when": "resourceExtname == .svg",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "svgManualEditor.newFile",
+          "when": "view == svgManualEditor.sidebar",
+          "group": "navigation"
+        },
+        {
+          "command": "svgManualEditor.openFile",
+          "when": "view == svgManualEditor.sidebar",
+          "group": "navigation"
+        },
+        {
+          "command": "svgManualEditor.refreshSidebar",
+          "when": "view == svgManualEditor.sidebar",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "svgManualEditor",
+          "title": "SVG 手动编辑器",
+          "icon": "assets/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "svgManualEditor": [
+        {
+          "type": "webview",
+          "id": "svgManualEditor.sidebar",
+          "name": "文件",
+          "visibility": "visible"
         }
       ]
     }

@@ -1,8 +1,8 @@
 const vscode = require("vscode");
 const fs = require("fs");
 const path = require("path");
+const { VIEW_TYPE } = require("./sidebar-model");
 
-const VIEW_TYPE = "svgManualEditor.editor";
 const PREFERENCES_KEY = "svgManualEditor.preferences.v1";
 
 class SvgCustomDocument {
@@ -153,16 +153,17 @@ class SvgCustomDocument {
 }
 
 class SvgManualEditorProvider {
-  static register(context) {
-    const provider = new SvgManualEditorProvider(context);
+  static register(context, onDocumentOpened) {
+    const provider = new SvgManualEditorProvider(context, onDocumentOpened);
     return vscode.window.registerCustomEditorProvider(VIEW_TYPE, provider, {
       webviewOptions: { retainContextWhenHidden: true },
       supportsMultipleEditorsPerDocument: false,
     });
   }
 
-  constructor(context) {
+  constructor(context, onDocumentOpened) {
     this.context = context;
+    this.onDocumentOpened = onDocumentOpened;
     this.changeEmitter = new vscode.EventEmitter();
     this.onDidChangeCustomDocument = this.changeEmitter.event;
   }
@@ -189,6 +190,9 @@ class SvgManualEditorProvider {
       this.onMessage(document, webviewPanel, message)
     );
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview);
+    if (typeof this.onDocumentOpened === "function") {
+      Promise.resolve(this.onDocumentOpened(document.uri)).catch(() => {});
+    }
   }
 
   async onMessage(document, webviewPanel, msg) {
@@ -347,7 +351,11 @@ function getNonce() {
 }
 
 function activate(context) {
-  context.subscriptions.push(SvgManualEditorProvider.register(context));
+  const { registerSidebar } = require("./sidebar-view");
+  const sidebar = registerSidebar(context);
+  context.subscriptions.push(
+    SvgManualEditorProvider.register(context, (uri) => sidebar.recordRecent(uri))
+  );
   context.subscriptions.push(
     vscode.commands.registerCommand("svgManualEditor.open", async (uri) => {
       const target = uri || vscode.window.activeTextEditor?.document.uri;

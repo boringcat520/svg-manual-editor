@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <!-- CSP -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SVG 手动编辑器</title>
+  <style>
+    @font-face {
+      font-family: seti;
+      src: url("seti.woff") format("woff");
+      font-weight: normal;
+      font-style: normal;
+    }
+  </style>
+  <link rel="stylesheet" href="sidebar.css" />
+</head>
+<body>
+  <div id="page">
+    <header class="hero">
+      <div class="brand">
+        <img class="brand-icon" src="icon.png" width="36" height="36" alt="SVG 手动编辑器">
+        <div class="brand-text">
+          <strong>手动编辑器</strong>
+          <em id="workspace-label">未打开工作区</em>
+        </div>
+      </div>
+      <p id="empty-hint" class="hint">还没有打开 SVG。新建一张，或打开项目里的文件，人和 AI 才能改同一张矢量图。</p>
+      <p id="open-hint" class="hint hidden">已有 SVG 在编辑。也可从下面切换文件，或再新建一张。</p>
+    </header>
+
+    <div class="actions">
+      <button id="btn-new" class="btn primary" type="button">新建 SVG</button>
+      <button id="btn-open" class="btn" type="button">打开文件</button>
+    </div>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>最近打开</h2>
+        <span id="recent-count" class="count"></span>
+      </div>
+      <ul id="recent-list" class="file-list"></ul>
+      <p id="recent-empty" class="empty">还没有用本编辑器打开过 SVG。</p>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>项目中的 SVG</h2>
+        <span id="project-count" class="count"></span>
+      </div>
+      <ul id="project-list" class="tree"></ul>
+      <p id="project-empty" class="empty">当前工作区没有 SVG 文件。</p>
+    </section>
+  </div>
+  <div id="context-menu" class="context-menu hidden" role="menu"></div>
+  <script src="sidebar.js"></script>
+</body>
+</html>

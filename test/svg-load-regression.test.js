@@ -24,6 +24,28 @@ test("the extension ships an editable SVG icon and a marketplace PNG", () => {
   assert.match(installerSource, /Copy-Item \(Join-Path \$src "assets"\)/);
 });
 
+test("the activity bar hosts a persistent SVG start page", () => {
+  const activityIcon = fs.readFileSync(path.join(root, "assets", "activitybar.svg"), "utf8");
+  const sidebarHtml = fs.readFileSync(path.join(root, "sidebar", "index.html"), "utf8");
+  const container = packageManifest.contributes.viewsContainers.activitybar[0];
+  const view = packageManifest.contributes.views.svgManualEditor[0];
+  assert.equal(container.id, "svgManualEditor");
+  assert.equal(container.icon, "assets/activitybar.svg");
+  assert.equal(view.type, "webview");
+  assert.equal(view.id, "svgManualEditor.sidebar");
+  assert.match(activityIcon, /viewBox="0 0 24 24"/);
+  assert.match(sidebarHtml, /id="btn-new"/);
+  assert.match(sidebarHtml, /id="recent-list"/);
+  assert.match(sidebarHtml, /id="project-list"/);
+  assert.match(sidebarHtml, /class="brand-icon"/);
+  assert.match(sidebarHtml, /id="context-menu"/);
+  assert.match(sidebarHtml, /url\("seti\.woff"\)/);
+  assert.equal(fs.existsSync(path.join(root, "sidebar", "fonts", "seti.woff")), true);
+  assert.match(extensionSource, /registerSidebar\(context\)/);
+  assert.match(installerSource, /sidebar-view\.js/);
+  assert.match(installerSource, /Copy-Item \(Join-Path \$src "sidebar"\)/);
+});
+
 test("SVG loading cannot loop forever on an unchanged firstChild", () => {
   assert.doesNotMatch(editorSource, /while\s*\(\s*svg\.firstChild\s*\)/);
   assert.match(editorSource, /for\s*\(const child of svg\.childNodes\)/);

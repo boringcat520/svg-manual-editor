@@ -45,6 +45,7 @@ function loadExtension(initialText = "<svg/>") {
     exports: module.exports,
     require(id) {
       if (id === "vscode") return vscode;
+      if (id.startsWith(".")) return require(path.join(__dirname, "..", id));
       return require(id);
     },
     setTimeout,
