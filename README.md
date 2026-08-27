@@ -52,10 +52,10 @@ Agent 负责「从零到有、从有到多种方案」，你负责把最后 10% 
 
 ## 安装 VSIX
 
-从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.33.vsix`，然后任选一种方式安装：
+从 [Releases](https://github.com/boringcat520/svg-manual-editor/releases) 下载 `svg-manual-editor-0.1.35.vsix`，然后任选一种方式安装：
 
 - **Cursor / VS Code：** 扩展面板 → `⋯` → **Install from VSIX…**，选中下载的 `.vsix`
-- **命令行：** `code --install-extension svg-manual-editor-0.1.33.vsix`（Cursor 可用 `cursor --install-extension`）
+- **命令行：** `code --install-extension svg-manual-editor-0.1.35.vsix`（Cursor 可用 `cursor --install-extension`）
 
 安装后重启编辑器。左侧活动栏会出现 **SVG手动编辑器** 图标，点击即可打开文件页：还没有打开 SVG 时，可以新建或打开项目里的文件；页面会列出工作区全部 SVG（带修改时间）和最近打开的文件（带打开时间）。也可以在资源管理器里对 `.svg` 右键 → **用 SVG手动编辑器打开**。
 

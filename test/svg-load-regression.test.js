@@ -478,6 +478,9 @@ test("right property sidebar has a persistent collapse control", () => {
   assert.match(cssSource, /body\.in-vscode \.file-name\s*\{\s*display:\s*none/);
   assert.match(extensionSource, /joinPath\(this\.context\.extensionUri, "assets", "icon.png"\)/);
   assert.doesNotMatch(cssSource, /@media \(max-width: 900px\)[\s\S]{0,400}grid-template-rows:\s*56px/);
+  assert.match(cssSource, /\.props\s*\{[^}]*grid-column:\s*3/s);
+  assert.match(cssSource, /@media \(max-width: 900px\)[\s\S]*?#app\.props-collapsed\s*\{[^}]*grid-template-columns:\s*64px minmax\(0, 1fr\) 38px/s);
+  assert.doesNotMatch(cssSource, /@media \(max-width: 900px\)[\s\S]*?\.props\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/);
   assert.match(editorSource, /togglePropsPanel\(/);
   assert.match(editorSource, /svg-editor-props-collapsed/);
 });
