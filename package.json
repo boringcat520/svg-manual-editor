@@ -1,7 +1,7 @@
 {
   "name": "svg-manual-editor",
   "displayName": "SVG手动编辑器",
-  "description": "PPT、Visio 没法跟 AI 协作改科研图；用 SVG 让 Agent 出图、你在画布上精修，同一份矢量来回改",
+  "description": "SVG手动编辑器：PPT、Visio 没法跟 AI 协作改科研图；用 SVG 让 Agent 出图、你在画布上精修，同一份矢量来回改",
   "version": "0.1.25",
   "publisher": "boringcat520",
   "icon": "assets/icon.png",
@@ -22,13 +22,17 @@
     "Other"
   ],
   "keywords": [
+    "SVG手动编辑器",
     "svg",
+    "svg编辑器",
     "editor",
     "diagram",
     "flowchart",
     "vector",
     "research",
-    "scientific-figure"
+    "scientific-figure",
+    "科研绘图",
+    "机制图"
   ],
   "activationEvents": [
     "onCustomEditor:svgManualEditor.editor",

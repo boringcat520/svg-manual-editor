@@ -24,6 +24,13 @@ test("the extension ships an editable SVG icon and a marketplace PNG", () => {
   assert.match(installerSource, /Copy-Item \(Join-Path \$src "assets"\)/);
 });
 
+test("the marketplace title has no space so SVG手动编辑器 can be searched", () => {
+  assert.equal(packageManifest.displayName, "SVG手动编辑器");
+  assert.doesNotMatch(packageManifest.displayName, /SVG\s+手动编辑器/);
+  assert.match(packageManifest.description, /^SVG手动编辑器/);
+  assert.equal(packageManifest.keywords.includes("SVG手动编辑器"), true);
+});
+
 test("the activity bar hosts a persistent SVG start page", () => {
   const activityIcon = fs.readFileSync(path.join(root, "assets", "activitybar.svg"), "utf8");
   const sidebarHtml = fs.readFileSync(path.join(root, "sidebar", "index.html"), "utf8");
