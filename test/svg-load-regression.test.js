@@ -495,6 +495,17 @@ test("high-resolution export supports SVG, PNG, JPEG and WebP in Cursor", () => 
   assert.match(editorSource, /exportSelectedFormat\(/);
   assert.match(editorSource, /raster\.toBlob\(/);
   assert.match(editorSource, /applyRasterExportSize\(/);
+  assert.match(editorSource, /writeRootSize\(/);
+  assert.match(editorSource, /parseSvgLength\(/);
+  assert.match(editorSource, /parseDocumentBox\(/);
+  assert.match(editorSource, /Number\.isFinite\(width\)/);
+  assert.match(editorSource, /componentGroupOf\(/);
+  assert.match(editorSource, /expandSelection\(/);
+  assert.match(editorSource, /isLayerGroup\(/);
+  assert.match(editorSource, /isLockedBackdrop\(/);
+  assert.match(editorSource, /nestedOccupants\(/);
+  assert.match(editorSource, /collectMoveItems\(/);
+  assert.doesNotMatch(editorSource, /if \(!svg \|\| width <= 0 \|\| height <= 0\) return svg;/);
   assert.match(editorSource, /loadExportImage\(/);
   assert.match(editorSource, /text-rendering", "geometricPrecision"/);
   assert.match(htmlSource, /value="8"/);

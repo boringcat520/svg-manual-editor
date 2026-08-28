@@ -13,6 +13,7 @@ test/**
 !assets/wechat-reward.jpg
 figure1_structured_v3.svg
 figure1_structured_v3*.png
+*浅层组件交付版.svg
 assets/icon.svg
 assets/demo-redacted.svg
 xhs-post/**

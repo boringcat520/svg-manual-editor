@@ -600,6 +600,81 @@
     return Number.isFinite(v) ? v : fallback;
   }
 
+  function tagOf(el) {
+    return String((el && el.tagName) || "").toLowerCase();
+  }
+
+  function parseSvgLength(value) {
+    const text = String(value == null ? "" : value).trim();
+    if (!text || text.toLowerCase() === "nan" || /%/.test(text)) return NaN;
+    const n = parseFloat(text);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  function parseViewBox(value) {
+    const nums = String(value || "")
+      .trim()
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map(Number);
+    if (nums.length !== 4 || nums.some((n) => !Number.isFinite(n))) return null;
+    if (!(nums[2] > 0) || !(nums[3] > 0)) return null;
+    return nums;
+  }
+
+  function formatCanvasSize(value, fallback = 800) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return String(fallback);
+    return String(Math.round(n * 1000) / 1000);
+  }
+
+  function isHitClone(el) {
+    return Boolean(el && el.classList && el.classList.contains("svg-ed-hit"));
+  }
+
+  function elementChildren(el) {
+    if (!el) return [];
+    if (el.children) return [...el.children];
+    return [...(el.childNodes || [])].filter((child) => child && child.tagName);
+  }
+
+  function isLayerGroup(el) {
+    if (tagOf(el) !== "g") return false;
+    if (el.getAttribute && el.getAttribute("data-layer")) return true;
+    if (el.getAttribute && el.getAttribute("inkscape:groupmode") === "layer") return true;
+    return /^layer[-_]/i.test(String((el.getAttribute && el.getAttribute("id")) || ""));
+  }
+
+  function isLockedBackdrop(el, docBox) {
+    if (!el || tagOf(el) !== "rect") return false;
+    if (el.closest && el.closest("defs")) return false;
+    const id = String((el.getAttribute && el.getAttribute("id")) || "").toLowerCase();
+    if (id === "artboard-bg" || id === "artboard" || id === "canvas-bg" || id === "paper-bg") return true;
+    if (!docBox) return false;
+    const x = num(el, "x");
+    const y = num(el, "y");
+    const w = num(el, "width");
+    const h = num(el, "height");
+    if (!(w > 0) || !(h > 0)) return false;
+    return (
+      Math.abs(x - docBox.x) <= 1 &&
+      Math.abs(y - docBox.y) <= 1 &&
+      Math.abs(w - docBox.w) <= 1 &&
+      Math.abs(h - docBox.h) <= 1
+    );
+  }
+
+  function isComponentGroup(el) {
+    if (tagOf(el) !== "g") return false;
+    if (isLayerGroup(el)) return false;
+    if (el.closest && el.closest("defs")) return false;
+    if (el.getAttribute && el.getAttribute("data-object")) return true;
+    const kids = elementChildren(el).filter((child) => !isHitClone(child));
+    const hasGraphic = kids.some((child) => GRAPHIC_TAGS.has(tagOf(child)) && tagOf(child) !== "text");
+    const hasText = kids.some((child) => tagOf(child) === "text");
+    return hasGraphic && hasText;
+  }
+
   function isActiveMarkerValue(value) {
     return Boolean(value && value !== "none");
   }
@@ -675,6 +750,10 @@
       });
       return;
     }
+    if (tag === "g") {
+      elementChildren(el).forEach((child) => moveBy(child, dx, dy));
+      return;
+    }
     if (tag === "rect" || tag === "image") {
       el.setAttribute("x", num(el, "x") + dx);
       el.setAttribute("y", num(el, "y") + dy);
@@ -709,26 +788,27 @@
     }
   }
 
-  function isEditable(el) {
+  function isEditable(el, docBox) {
     if (!el || !el.tagName || el === content) return false;
     if (el.closest && el.closest("defs")) return false;
     if (el.classList && el.classList.contains("svg-ed-hit")) return false;
+    if (isLockedBackdrop(el, docBox)) return false;
     const tag = el.tagName.toLowerCase();
     if (tag === "tspan") return el.closest("text");
     return GRAPHIC_TAGS.has(tag);
   }
 
-  function graphicFromTarget(el) {
+  function graphicFromTarget(el, docBox) {
     if (!el) return null;
     if (el.classList && el.classList.contains("svg-ed-hit")) {
       const id = el.getAttribute("data-ed-for");
       return id ? content.querySelector(`[data-ed-id="${id}"]`) : null;
     }
     const text = el.closest && el.closest("text");
-    if (text && content.contains(text)) return text;
+    if (text && content.contains(text) && isEditable(text, docBox)) return text;
     let cur = el;
     while (cur && cur !== content) {
-      if (isEditable(cur)) return cur;
+      if (isEditable(cur, docBox)) return cur;
       cur = cur.parentNode;
     }
     return null;
@@ -1871,14 +1951,15 @@
         this.status("无法解析 SVG 文件");
         return;
       }
-      this.originalAttrs = [...svg.attributes].map((a) => [a.name, a.value]);
-      let vb = (svg.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
-      if (vb.length !== 4 || vb.some((n) => !Number.isFinite(n))) {
-        const w = parseFloat(svg.getAttribute("width")) || 800;
-        const h = parseFloat(svg.getAttribute("height")) || 600;
-        vb = [0, 0, w, h];
-      }
-      this.docBox = { x: vb[0], y: vb[1], w: vb[2], h: vb[3] };
+      const parsedBox = this.parseDocumentBox(svg);
+      this.docBox = { x: parsedBox.x, y: parsedBox.y, w: parsedBox.w, h: parsedBox.h };
+      this.originalAttrs = [...svg.attributes]
+        .map((a) => [a.name, a.value])
+        .filter(([name, value]) => {
+          if (name === "width" || name === "height") return Number.isFinite(parseSvgLength(value));
+          if (name === "viewBox") return Boolean(parseViewBox(value));
+          return true;
+        });
 
       // Import a stable snapshot of the source children. The old loop tested
       // svg.firstChild but only cloned it, so svg.firstChild never changed and
@@ -2201,19 +2282,62 @@
       this.syncConnectorMarkers(el);
     }
 
+    parseDocumentBox(svg) {
+      const viewBox = parseViewBox(svg && svg.getAttribute && svg.getAttribute("viewBox"));
+      const width = parseSvgLength(svg && svg.getAttribute && svg.getAttribute("width"));
+      const height = parseSvgLength(svg && svg.getAttribute && svg.getAttribute("height"));
+      if (viewBox) {
+        return { x: viewBox[0], y: viewBox[1], w: viewBox[2], h: viewBox[3], width, height };
+      }
+      return {
+        x: 0,
+        y: 0,
+        w: width > 0 ? width : 800,
+        h: height > 0 ? height : 600,
+        width,
+        height,
+      };
+    }
+
+    writeRootSize(svg, options = {}) {
+      const pixelWidth = Math.round(Number(options.pixelWidth));
+      const pixelHeight = Math.round(Number(options.pixelHeight));
+      if (
+        Number.isFinite(pixelWidth) &&
+        Number.isFinite(pixelHeight) &&
+        pixelWidth > 0 &&
+        pixelHeight > 0
+      ) {
+        this.applyRasterExportSize(svg, { pixelWidth, pixelHeight });
+        return;
+      }
+      const orig = Object.fromEntries(this.originalAttrs || []);
+      const width = Number.isFinite(parseSvgLength(orig.width))
+        ? orig.width
+        : formatCanvasSize(this.docBox && this.docBox.w, 800);
+      const height = Number.isFinite(parseSvgLength(orig.height))
+        ? orig.height
+        : formatCanvasSize(this.docBox && this.docBox.h, 600);
+      svg.setAttribute("width", width);
+      svg.setAttribute("height", height);
+    }
+
     serialize(options = {}) {
       const svg = document.createElementNS(NS, "svg");
       const seen = new Set();
       for (const [k, v] of this.originalAttrs) {
+        if (k === "width" || k === "height" || k === "viewBox") continue;
         svg.setAttribute(k, v);
         seen.add(k);
       }
       if (!seen.has("xmlns")) svg.setAttribute("xmlns", NS);
-      svg.setAttribute(
-        "viewBox",
-        `${this.docBox.x} ${this.docBox.y} ${this.docBox.w} ${this.docBox.h}`
-      );
-      this.applyRasterExportSize(svg, options);
+      const box = this.docBox || { x: 0, y: 0, w: 800, h: 600 };
+      const x = Number.isFinite(box.x) ? box.x : 0;
+      const y = Number.isFinite(box.y) ? box.y : 0;
+      const w = Number.isFinite(box.w) && box.w > 0 ? box.w : 800;
+      const h = Number.isFinite(box.h) && box.h > 0 ? box.h : 600;
+      svg.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+      this.writeRootSize(svg, options);
       for (const child of content.childNodes) {
         if (child.nodeType !== 1) {
           svg.appendChild(child.cloneNode(true));
@@ -2244,7 +2368,15 @@
     applyRasterExportSize(svg, options = {}) {
       const width = Math.round(Number(options.pixelWidth));
       const height = Math.round(Number(options.pixelHeight));
-      if (!svg || width <= 0 || height <= 0) return svg;
+      if (
+        !svg ||
+        !Number.isFinite(width) ||
+        !Number.isFinite(height) ||
+        width <= 0 ||
+        height <= 0
+      ) {
+        return svg;
+      }
       svg.setAttribute("width", String(width));
       svg.setAttribute("height", String(height));
       svg.setAttribute("text-rendering", "geometricPrecision");
@@ -3616,16 +3748,154 @@
       this.status("已导出 " + fileName);
     }
 
-    containedText(rect) {
-      const rb = rect.getBBox();
-      return [...content.querySelectorAll("text")].filter((t) => {
-        if (t.closest("defs")) return false;
-        if (t.hasAttribute("data-line-label-for")) return false;
-        const b = t.getBBox();
-        const cx = b.x + b.width / 2;
-        const cy = b.y + b.height / 2;
-        return cx >= rb.x && cx <= rb.x + rb.width && cy >= rb.y && cy <= rb.y + rb.height;
+    componentGroupOf(el) {
+      let cur = el && el.parentNode;
+      while (cur && cur !== content) {
+        if (isComponentGroup(cur)) return cur;
+        cur = cur.parentNode;
+      }
+      return null;
+    }
+
+    graphicsIn(root, out = []) {
+      elementChildren(root).forEach((child) => {
+        if (isHitClone(child)) return;
+        const tag = tagOf(child);
+        if (GRAPHIC_TAGS.has(tag)) out.push(child);
+        if (tag === "g") this.graphicsIn(child, out);
       });
+      return out;
+    }
+
+    collectTexts() {
+      const listed =
+        typeof content.querySelectorAll === "function" ? [...content.querySelectorAll("text")] : [];
+      if (listed.length) return listed;
+      return this.graphicsIn(content).filter((el) => tagOf(el) === "text");
+    }
+
+    ownerLinkedGraphics(el) {
+      if (!el || !el.getAttribute) return [];
+      const members = new Set();
+      const add = (node) => {
+        if (node) members.add(node);
+      };
+      add(el);
+      const ownId = el.getAttribute("id");
+      const ownerId = el.getAttribute("data-parent-shape") || el.getAttribute("data-owner");
+      this.collectTexts().forEach((text) => {
+        const parentShape = text.getAttribute("data-parent-shape");
+        const owner = text.getAttribute("data-owner");
+        if (ownId && (parentShape === ownId || owner === ownId)) add(text);
+        if (ownerId && (text === el || parentShape === ownerId || owner === ownerId || text.getAttribute("id") === ownerId)) {
+          add(text);
+        }
+      });
+      if (ownerId) {
+        this.graphicsIn(content).forEach((node) => {
+          if (node.getAttribute && node.getAttribute("id") === ownerId) add(node);
+        });
+      }
+      return [...members];
+    }
+
+    componentMembers(el) {
+      const group = this.componentGroupOf(el);
+      if (group) {
+        return this.graphicsIn(group).filter((node) => !node.hasAttribute || !node.hasAttribute("data-line-label-for"));
+      }
+      const linked = this.ownerLinkedGraphics(el);
+      return linked.length > 1 ? linked : [];
+    }
+
+    expandSelection(el) {
+      if (!el || isLockedBackdrop(el, this.docBox)) return [];
+      const members = this.componentMembers(el).filter((node) => !isLockedBackdrop(node, this.docBox));
+      return members.length ? members : [el];
+    }
+
+    boxFromElement(el) {
+      const box = this.elementBox(el);
+      if (box) return box;
+      const tag = tagOf(el);
+      if (tag === "rect" || tag === "image") {
+        const x = num(el, "x");
+        const y = num(el, "y");
+        const w = num(el, "width");
+        const h = num(el, "height");
+        if (w > 0 && h > 0) {
+          return { el, tag, left: x, top: y, right: x + w, bottom: y + h, width: w, height: h, cx: x + w / 2, cy: y + h / 2 };
+        }
+      }
+      if (tag === "text") {
+        const x = num(el, "x");
+        const y = num(el, "y");
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          return { el, tag, left: x, top: y - 8, right: x + 8, bottom: y + 8, width: 8, height: 16, cx: x, cy: y };
+        }
+      }
+      return null;
+    }
+
+    nestedOccupants(el) {
+      const group = this.componentGroupOf(el);
+      if (!group || (group.getAttribute && group.getAttribute("data-object")) !== "section") return [];
+      const shape = this.componentMembers(group).find((node) => tagOf(node) === "rect") || el;
+      const box = this.boxFromElement(shape);
+      if (!box || box.width < 40 || box.height < 40) return [];
+      const own = new Set(this.componentMembers(group));
+      const found = [];
+      this.graphicsIn(content).forEach((node) => {
+        if (!node || own.has(node) || isLockedBackdrop(node, this.docBox) || isHitClone(node)) return;
+        if (this.componentGroupOf(node) === group) return;
+        const inner = this.boxFromElement(node);
+        if (!inner) return;
+        if (inner.cx >= box.left && inner.cx <= box.right && inner.cy >= box.top && inner.cy <= box.bottom) {
+          found.push(node);
+        }
+      });
+      return found;
+    }
+
+    collectMoveItems(els) {
+      const movers = new Set();
+      const add = (node) => {
+        if (node && !isLockedBackdrop(node, this.docBox)) movers.add(node);
+      };
+      (els || []).forEach((el) => {
+        this.expandSelection(el).forEach(add);
+        if (isConnectableShape(el)) this.containedText(el).forEach(add);
+        if (isConnectorElement(el)) {
+          const label = this.connectorLabelFor(el);
+          if (label) add(label);
+        }
+        this.nestedOccupants(el).forEach((item) => this.expandSelection(item).forEach(add));
+      });
+      return [...movers];
+    }
+
+    reorderNode(el) {
+      return this.componentGroupOf(el) || el;
+    }
+
+    containedText(rect) {
+      const grouped = this.componentMembers(rect).filter(
+        (el) => tagOf(el) === "text" && el !== rect && !(el.hasAttribute && el.hasAttribute("data-line-label-for"))
+      );
+      if (grouped.length) return grouped;
+      try {
+        const rb = rect.getBBox();
+        return this.collectTexts().filter((t) => {
+          if (t.closest && t.closest("defs")) return false;
+          if (t.hasAttribute("data-line-label-for")) return false;
+          const b = t.getBBox();
+          const cx = b.x + b.width / 2;
+          const cy = b.y + b.height / 2;
+          return cx >= rb.x && cx <= rb.x + rb.width && cy >= rb.y && cy <= rb.y + rb.height;
+        });
+      } catch (_) {
+        return [];
+      }
     }
 
     moveSet(els, dx, dy) {
@@ -3727,6 +3997,7 @@
         .filter((el) => {
           if (excluded.has(el) || el.closest("defs")) return false;
           if (el.classList.contains("svg-ed-hit")) return false;
+          if (isLockedBackdrop(el, this.docBox)) return false;
           return GRAPHIC_TAGS.has(el.tagName.toLowerCase());
         })
         .slice(0, 500)
@@ -3738,6 +4009,7 @@
       return [...content.querySelectorAll("[data-ed-id]")]
         .filter((el) => {
           if (el === excludedEl || el.closest("defs")) return false;
+          if (isLockedBackdrop(el, this.docBox)) return false;
           return isConnectableShape(el);
         })
         .slice(0, 500)
@@ -6057,8 +6329,13 @@
           const rectBox = this.elementBox(el);
           if (rectBox) this.addBoxResizeHandles(el, rectBox, "rect");
         } else if (tag === "text" && !el.hasAttribute("data-line-label-for")) {
-          const textBox = this.elementBox(el);
-          if (textBox) this.addBoxResizeHandles(el, textBox, "text");
+          const groupedWithShape = this.componentMembers(el).some(
+            (item) => item !== el && isConnectableShape(item) && this.selected.includes(item)
+          );
+          if (!groupedWithShape) {
+            const textBox = this.elementBox(el);
+            if (textBox) this.addBoxResizeHandles(el, textBox, "text");
+          }
         }
         if (selectionBox && hasArrowMarker(el)) {
           rotatable.push({ el, box: selectionBox });
@@ -6308,7 +6585,7 @@
         return;
       }
 
-      const el = graphicFromTarget(e.target);
+      const el = graphicFromTarget(e.target, this.docBox);
       if (el) {
         if (
           this.tool === "select" &&
@@ -6331,18 +6608,11 @@
             return;
           }
         }
-        if (!this.selected.includes(el) && !e.shiftKey) this.select([el], false);
-        else if (e.shiftKey) this.select([el], true);
-        const movers = new Set(this.selected);
-        this.selected.forEach((s) => {
-          if (isConnectableShape(s)) {
-            this.containedText(s).forEach((t) => movers.add(t));
-          }
-          if (isConnectorElement(s)) {
-            const label = this.connectorLabelFor(s);
-            if (label) movers.add(label);
-          }
-        });
+        const groupSelection = this.expandSelection(el);
+        const alreadySelected = groupSelection.some((item) => this.selected.includes(item));
+        if (!alreadySelected && !e.shiftKey) this.select(groupSelection, false);
+        else if (e.shiftKey) this.select(groupSelection, true);
+        const movers = new Set(this.collectMoveItems(this.selected));
         const textClick = el.tagName.toLowerCase() === "text";
         this.drag = {
           type: "move",
@@ -6684,6 +6954,7 @@
         if (d.rect && d.rect.w > 4 && d.rect.h > 4) {
           const hits = [...content.querySelectorAll("*")].filter((el) => {
             if (!GRAPHIC_TAGS.has(el.tagName.toLowerCase()) || el.closest("defs")) return false;
+            if (isLockedBackdrop(el, this.docBox)) return false;
             try {
               const b = el.getBBox();
               const cx = b.x + b.width / 2;
@@ -6816,11 +7087,41 @@
       return { rx, ry, rw, rh };
     }
 
+    scaleAffiliatedFromBox(anchor, from, to) {
+      if (!anchor || !from || !to) return;
+      if (!(from.w > 0) || !(from.h > 0)) return;
+      const sx = to.w / from.w;
+      const sy = to.h / from.h;
+      if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
+      if (Math.abs(sx - 1) < 1e-9 && Math.abs(sy - 1) < 1e-9 && Math.abs(to.x - from.x) < 1e-9 && Math.abs(to.y - from.y) < 1e-9) {
+        return;
+      }
+      const fontScale = (Math.abs(sx) + Math.abs(sy)) / 2;
+      this.componentMembers(anchor).forEach((el) => {
+        if (el === anchor || tagOf(el) !== "text") return;
+        const map = (node) => {
+          if (node.hasAttribute("x")) node.setAttribute("x", to.x + (num(node, "x") - from.x) * sx);
+          if (node.hasAttribute("y")) node.setAttribute("y", to.y + (num(node, "y") - from.y) * sy);
+        };
+        map(el);
+        elementChildren(el).forEach((child) => {
+          if (tagOf(child) === "tspan") map(child);
+        });
+        const fontSize = parseFloat((el.style && el.style.fontSize) || (el.getAttribute && el.getAttribute("font-size")));
+        if (Number.isFinite(fontSize) && fontSize > 0) {
+          const next = Math.min(120, Math.max(1, Math.round(fontSize * fontScale * 10) / 10));
+          el.setAttribute("font-size", String(next));
+          if (el.style) el.style.fontSize = next + "px";
+        }
+      });
+    }
+
     resizeRect(el, pos, x, y, targets = [], bypass = false, origin = null) {
       let rx = num(el, "x");
       let ry = num(el, "y");
       let rw = num(el, "width");
       let rh = num(el, "height");
+      const fromBox = { x: rx, y: ry, w: rw, h: rh };
       const r = rx + rw;
       const b = ry + rh;
       if (pos.includes("w")) {
@@ -6872,6 +7173,7 @@
       el.setAttribute("y", ry);
       el.setAttribute("width", rw);
       el.setAttribute("height", rh);
+      this.scaleAffiliatedFromBox(el, fromBox, { x: rx, y: ry, w: rw, h: rh });
       if (widthMatch) {
         const target = widthMatch.target;
         const edgeX = pos.includes("w") ? rx : rx + rw;
@@ -6922,14 +7224,21 @@
       proxy.setAttribute("width", box.width);
       proxy.setAttribute("height", box.height);
       const guides = this.resizeRect(proxy, pos, x, y, targets, bypass, origin);
+      const to = {
+        x: num(proxy, "x"),
+        y: num(proxy, "y"),
+        w: num(proxy, "width"),
+        h: num(proxy, "height"),
+      };
       this.updateFlowShapeGeometry(
         el,
         el.getAttribute("data-flow-shape") || "rect",
-        num(proxy, "x"),
-        num(proxy, "y"),
-        num(proxy, "width"),
-        num(proxy, "height")
+        to.x,
+        to.y,
+        to.w,
+        to.h
       );
+      this.scaleAffiliatedFromBox(el, { x: box.left, y: box.top, w: box.width, h: box.height }, to);
       return guides;
     }
 
@@ -7120,7 +7429,7 @@
         this.finishPolyline();
         return;
       }
-      const el = graphicFromTarget(e.target);
+      const el = graphicFromTarget(e.target, this.docBox);
       if (el && el.tagName.toLowerCase() === "text") {
         this.startTextEdit(el);
       } else if (isLineLikeConnector(el)) {
@@ -7262,27 +7571,49 @@
 
     deleteSelected() {
       if (!this.selected.length) return;
+      const targets = [];
+      const seen = new Set();
       this.selected.forEach((el) => {
-        if (isConnectorElement(el)) {
-          const label = this.connectorLabelFor(el);
-          this.removeConnectorLabelCutout(el);
-          if (label) label.remove();
-        } else if (el.hasAttribute && el.hasAttribute("data-line-label-for")) {
-          this.removeConnectorLabelCutout(this.connectorForLabel(el));
-        }
-        el.remove();
+        const node = this.reorderNode(el);
+        if (!node || seen.has(node)) return;
+        seen.add(node);
+        targets.push(node);
+      });
+      targets.forEach((node) => {
+        const members = tagOf(node) === "g" ? this.graphicsIn(node) : [node];
+        members.forEach((el) => {
+          if (isConnectorElement(el)) {
+            const label = this.connectorLabelFor(el);
+            this.removeConnectorLabelCutout(el);
+            if (label) label.remove();
+          } else if (el.hasAttribute && el.hasAttribute("data-line-label-for")) {
+            this.removeConnectorLabelCutout(this.connectorForLabel(el));
+          }
+        });
+        node.remove();
       });
       this.selected = [];
       this.commit("已删除");
     }
 
     order(dir) {
+      const nodes = [];
+      const seen = new Set();
       this.selected.forEach((el) => {
-        if (dir === "front") content.appendChild(el);
-        else {
-          const defs = content.querySelector("defs");
-          content.insertBefore(el, defs ? defs.nextSibling : content.firstChild);
+        const node = this.reorderNode(el);
+        if (!node || seen.has(node)) return;
+        seen.add(node);
+        nodes.push(node);
+      });
+      nodes.forEach((el) => {
+        const parent = el.parentNode || content;
+        if (dir === "front") {
+          parent.appendChild(el);
+          return;
         }
+        const defs = elementChildren(parent).find((child) => tagOf(child) === "defs");
+        const first = elementChildren(parent)[0] || parent.firstChild || null;
+        parent.insertBefore(el, defs && defs.nextSibling ? defs.nextSibling : first);
       });
       this.commit(dir === "front" ? "已置于顶层" : "已置于底层");
     }
@@ -7391,14 +7722,7 @@
         const step = e.shiftKey ? 10 : 1;
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-        const movers = new Set(this.selected);
-        this.selected.forEach((s) => {
-          if (isConnectableShape(s)) this.containedText(s).forEach((t) => movers.add(t));
-          if (isConnectorElement(s)) {
-            const label = this.connectorLabelFor(s);
-            if (label) movers.add(label);
-          }
-        });
+        const movers = new Set(this.collectMoveItems(this.selected));
         this.moveSet([...movers], dx, dy);
         this.reflowGluedConnectors([...movers]);
         this.syncConnectorLabels();
@@ -8149,6 +8473,7 @@
           width,
           height
         );
+        this.scaleAffiliatedFromBox(el, current, { x, y, w: width, h: height });
         this.reflowGluedConnectors([el]);
         return;
       }
@@ -8182,6 +8507,9 @@
       if (tag === "rect" || tag === "image") {
         el.setAttribute("width", width);
         el.setAttribute("height", height);
+        if (current) {
+          this.scaleAffiliatedFromBox(el, current, { x: current.x, y: current.y, w: width, h: height });
+        }
         if (tag === "rect") this.reflowGluedConnectors([el]);
         return;
       }

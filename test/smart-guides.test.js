@@ -36,11 +36,21 @@ class FakeNode {
   hasAttribute(name) { return this[name] !== undefined; }
   removeAttribute(name) { delete this[name]; }
   appendChild(child) {
+    if (child.parentNode && child.parentNode.removeChild) {
+      child.parentNode.removeChild(child);
+    } else if (child.parentNode && Array.isArray(child.parentNode.childNodes)) {
+      child.parentNode.childNodes = child.parentNode.childNodes.filter((node) => node !== child);
+    }
     child.parentNode = this;
     this.childNodes.push(child);
     return child;
   }
   insertBefore(child, ref) {
+    if (child.parentNode && child.parentNode.removeChild) {
+      child.parentNode.removeChild(child);
+    } else if (child.parentNode && Array.isArray(child.parentNode.childNodes)) {
+      child.parentNode.childNodes = child.parentNode.childNodes.filter((node) => node !== child);
+    }
     child.parentNode = this;
     const index = ref ? this.childNodes.indexOf(ref) : 0;
     this.childNodes.splice(index < 0 ? 0 : index, 0, child);
@@ -2301,4 +2311,190 @@ test("eyedropper wheel zooms the canvas instead of swallowing", () => {
   });
   assert.equal(zoomed, true);
   assert.ok(editor.eyedropper);
+});
+
+test("regular save keeps finite canvas sizes instead of writing NaN", () => {
+  const { editor } = loadEditor();
+  const svg = new FakeNode("root", "svg");
+  svg.setAttribute("width", "1800");
+  svg.setAttribute("height", "1080");
+  editor.applyRasterExportSize(svg, {});
+  assert.equal(svg.getAttribute("width"), "1800");
+  assert.equal(svg.getAttribute("height"), "1080");
+  editor.applyRasterExportSize(svg, { pixelWidth: Number.NaN, pixelHeight: Number.NaN });
+  assert.equal(svg.getAttribute("width"), "1800");
+  assert.equal(svg.getAttribute("height"), "1080");
+
+  editor.docBox = { x: 0, y: 0, w: 1800, h: 1080 };
+  editor.originalAttrs = [
+    ["width", "NaN"],
+    ["height", "NaN"],
+    ["viewBox", "0 0 1800 1080"],
+  ];
+  const saved = new FakeNode("saved", "svg");
+  editor.writeRootSize(saved, {});
+  assert.equal(saved.getAttribute("width"), "1800");
+  assert.equal(saved.getAttribute("height"), "1080");
+  assert.doesNotMatch(saved.getAttribute("width"), /NaN/i);
+
+  const source = new FakeNode("source", "svg");
+  source.setAttribute("width", "NaN");
+  source.setAttribute("height", "NaN");
+  source.setAttribute("viewBox", "0 0 1800 1080");
+  const box = editor.parseDocumentBox(source);
+  assert.equal(box.x, 0);
+  assert.equal(box.y, 0);
+  assert.equal(box.w, 1800);
+  assert.equal(box.h, 1080);
+});
+
+test("grouped rect and text stay in the same component and move together", () => {
+  const { editor, nodes } = loadEditor();
+  const content = nodes.get("content");
+  const layer = new FakeNode("layer-components", "g");
+  layer.setAttribute("id", "layer-components");
+  const card = new FakeNode("card-01", "g");
+  card.setAttribute("id", "card-01");
+  card.setAttribute("data-object", "card");
+  card.setAttribute("data-name", "参与方 1");
+  const rect = new FakeNode("card-01-bg", "rect");
+  rect.setAttribute("id", "card-01-bg");
+  rect.setAttribute("x", "106");
+  rect.setAttribute("y", "251");
+  rect.setAttribute("width", "419");
+  rect.setAttribute("height", "139");
+  const text = new FakeNode("card-01-title", "text");
+  text.setAttribute("id", "card-01-title");
+  text.setAttribute("x", "128");
+  text.setAttribute("y", "292");
+  text.setAttribute("data-owner", "card-01");
+  text.setAttribute("data-parent-shape", "card-01-bg");
+  card.appendChild(rect);
+  card.appendChild(text);
+  layer.appendChild(card);
+  content.appendChild(layer);
+
+  assert.equal(editor.componentGroupOf(rect), card);
+  assert.equal(editor.componentGroupOf(text), card);
+  const members = editor.componentMembers(rect);
+  assert.equal(members.length, 2);
+  assert.equal(members[0], rect);
+  assert.equal(members[1], text);
+  const expanded = editor.expandSelection(rect);
+  assert.equal(expanded.length, 2);
+  assert.equal(expanded[0], rect);
+  assert.equal(expanded[1], text);
+  const labels = editor.containedText(rect);
+  assert.equal(labels.length, 1);
+  assert.equal(labels[0], text);
+
+  editor.moveSet(editor.expandSelection(rect), 10, 20);
+  assert.equal(rect.getAttribute("x"), "116");
+  assert.equal(rect.getAttribute("y"), "271");
+  assert.equal(text.getAttribute("x"), "138");
+  assert.equal(text.getAttribute("y"), "312");
+  assert.equal(text.parentNode, card);
+  assert.equal(rect.parentNode, card);
+  assert.equal(card.parentNode, layer);
+
+  editor.selected = [rect, text];
+  editor.commit = () => {};
+  editor.order("front");
+  assert.equal(card.parentNode, layer);
+  assert.equal(layer.childNodes[layer.childNodes.length - 1], card);
+  assert.equal(text.parentNode, card);
+});
+
+test("resizing a grouped rectangle scales sibling text with the same origin", () => {
+  const { editor, nodes } = loadEditor();
+  const content = nodes.get("content");
+  const card = new FakeNode("card-scale", "g");
+  card.setAttribute("data-object", "card");
+  const rect = new FakeNode("card-scale-bg", "rect");
+  rect.setAttribute("x", "100");
+  rect.setAttribute("y", "200");
+  rect.setAttribute("width", "200");
+  rect.setAttribute("height", "100");
+  const text = new FakeNode("card-scale-title", "text");
+  text.setAttribute("x", "120");
+  text.setAttribute("y", "230");
+  card.appendChild(rect);
+  card.appendChild(text);
+  content.appendChild(card);
+
+  editor.scaleAffiliatedFromBox(rect, { x: 100, y: 200, w: 200, h: 100 }, { x: 100, y: 200, w: 400, h: 200 });
+  assert.equal(Number(text.getAttribute("x")), 140);
+  assert.equal(Number(text.getAttribute("y")), 260);
+  assert.equal(text.parentNode, card);
+});
+
+test("Codex layer groups and full-canvas artboards are not treated as movable components", () => {
+  const { editor, nodes } = loadEditor();
+  const content = nodes.get("content");
+  editor.docBox = { x: 0, y: 0, w: 1800, h: 1080 };
+
+  const layer = new FakeNode("layer-background", "g");
+  layer.setAttribute("id", "layer-background");
+  layer.setAttribute("data-layer", "background");
+  layer.setAttribute("data-name", "背景");
+  const artboard = new FakeNode("artboard-bg", "rect");
+  artboard.setAttribute("id", "artboard-bg");
+  artboard.setAttribute("x", "0");
+  artboard.setAttribute("y", "0");
+  artboard.setAttribute("width", "1800");
+  artboard.setAttribute("height", "1080");
+  const section = new FakeNode("region-participants-bg-group", "g");
+  section.setAttribute("data-object", "section");
+  const sectionRect = new FakeNode("region-participants-bg", "rect");
+  sectionRect.setAttribute("x", "61");
+  sectionRect.setAttribute("y", "150");
+  sectionRect.setAttribute("width", "508");
+  sectionRect.setAttribute("height", "633");
+  const sectionTitle = new FakeNode("section-participants-title", "text");
+  sectionTitle.setAttribute("x", "112");
+  sectionTitle.setAttribute("y", "204");
+  section.appendChild(sectionRect);
+  section.appendChild(sectionTitle);
+  layer.appendChild(artboard);
+  layer.appendChild(section);
+  content.appendChild(layer);
+
+  const cards = new FakeNode("layer-components", "g");
+  cards.setAttribute("data-layer", "components");
+  cards.setAttribute("data-name", "图形组件");
+  const card = new FakeNode("card-participant-01", "g");
+  card.setAttribute("data-object", "card");
+  const cardRect = new FakeNode("card-participant-01-bg", "rect");
+  cardRect.setAttribute("x", "106");
+  cardRect.setAttribute("y", "251");
+  cardRect.setAttribute("width", "419");
+  cardRect.setAttribute("height", "139");
+  const cardTitle = new FakeNode("card-participant-01-title", "text");
+  cardTitle.setAttribute("x", "128");
+  cardTitle.setAttribute("y", "292");
+  card.appendChild(cardRect);
+  card.appendChild(cardTitle);
+  cards.appendChild(card);
+  content.appendChild(cards);
+
+  assert.equal(editor.componentGroupOf(artboard), null);
+  assert.equal(editor.expandSelection(artboard).length, 0);
+  assert.equal(editor.componentGroupOf(sectionRect), section);
+  const occupants = editor.nestedOccupants(sectionRect);
+  assert.equal(occupants.includes(cardRect), true);
+  assert.equal(occupants.includes(cardTitle), true);
+  assert.equal(occupants.includes(artboard), false);
+
+  const movers = editor.collectMoveItems([sectionRect]);
+  assert.equal(movers.includes(sectionRect), true);
+  assert.equal(movers.includes(sectionTitle), true);
+  assert.equal(movers.includes(cardRect), true);
+  assert.equal(movers.includes(cardTitle), true);
+  assert.equal(movers.includes(artboard), false);
+
+  editor.moveSet(movers, 12, 0);
+  assert.equal(cardRect.getAttribute("x"), "118");
+  assert.equal(cardTitle.getAttribute("x"), "140");
+  assert.equal(sectionRect.getAttribute("x"), "73");
+  assert.equal(artboard.getAttribute("x"), "0");
 });

@@ -2,7 +2,7 @@
   "name": "svg-manual-editor",
   "displayName": "SVG手动编辑器",
   "description": "SVG手动编辑器：PPT、Visio 没法跟 AI 协作改科研图；用 SVG 让 Agent 出图、你在画布上精修，同一份矢量来回改",
-  "version": "0.1.35",
+  "version": "0.1.37",
   "publisher": "boringcat520",
   "icon": "assets/icon.png",
   "license": "GPL-3.0-only",
